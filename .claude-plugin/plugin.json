@@ -1,0 +1,8 @@
+{
+  "name": "claude-assistant",
+  "description": "Live token usage statusline, per-session cost log, and git intent shortcuts for Claude Code",
+  "version": "1.0.0",
+  "author": {
+    "name": "lamp"
+  }
+}

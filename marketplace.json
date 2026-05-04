@@ -1,0 +1,24 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "claude-assistant",
+  "description": "Personal Claude Code assistant — token tracking, git shortcuts, and statusline",
+  "owner": {
+    "name": "lamp",
+    "email": "lam.pham@thetrainline.com"
+  },
+  "plugins": [
+    {
+      "name": "claude-assistant",
+      "description": "Live token usage statusline, per-session cost log, and git intent shortcuts for Claude Code",
+      "author": {
+        "name": "lamp"
+      },
+      "category": "productivity",
+      "source": {
+        "source": "git",
+        "url": "https://github.com/lamp/claude-assistant.git",
+        "ref": "main"
+      }
+    }
+  ]
+}
