@@ -33,9 +33,23 @@ elif [ "$cost_int" -ge 10 ]; then cost_color=$YELLOW
 else cost_color=$GREEN
 fi
 
+session_id=$(echo "$input" | jq -r '.session_id // empty')
+compact_info=""
+compact_file=~/.claude/compaction/result.json
+if [ -f "$compact_file" ]; then
+  compact_session=$(jq -r '.session_id // empty' "$compact_file")
+  if [ "$compact_session" = "$session_id" ]; then
+    reduced=$(jq -r '.reduced // 0' "$compact_file")
+    before=$(jq -r '.tokens_before // 0' "$compact_file")
+    pct=$(echo "scale=0; $reduced * 100 / $before" | bc 2>/dev/null)
+    compact_info=" ${YELLOW}compact${RESET}:${WHITE}-${reduced}tok(-${pct}%)${RESET}"
+  fi
+fi
+
 printf "${BOLD}${CYAN}[${model}]${RESET} "
 printf "${BLUE}in${RESET}:${WHITE}${in_tok}${RESET}(${WHITE}${total_in}${RESET}) "
 printf "${MAGENTA}out${RESET}:${WHITE}${out_tok}${RESET} "
 printf "${CYAN}cache(r/w)${RESET}:${WHITE}${cache_r}/${cache_w}${RESET} "
 printf "${ctx_color}ctx${RESET}:${WHITE}${ctx_pct}%%${RESET} "
-printf "${cost_color}cost${RESET}:${WHITE}\$${cost_fmt}${RESET}\n"
+printf "${cost_color}cost${RESET}:${WHITE}\$${cost_fmt}${RESET}"
+printf "${compact_info}\n"

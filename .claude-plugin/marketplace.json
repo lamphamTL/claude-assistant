@@ -14,11 +14,7 @@
         "name": "lamp"
       },
       "category": "productivity",
-      "source": {
-        "source": "git",
-        "url": "https://github.com/lamp/claude-assistant.git",
-        "ref": "main"
-      }
+      "source": "./"
     }
   ]
 }

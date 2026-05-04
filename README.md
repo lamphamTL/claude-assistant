@@ -1,6 +1,6 @@
 # claude-assistant
 
-A Claude Code plugin providing token usage tracking, a live statusline, and git shortcut commands.
+A Claude Code plugin providing token usage tracking, a live statusline, compaction analysis, and git shortcut commands.
 
 ## Features
 
@@ -52,7 +52,28 @@ Colour thresholds:
 
 ---
 
-### 3. Git Intent Shortcuts
+### 3. Compaction Analysis
+
+**Scripts:** [`hooks/pre-compact.sh`](hooks/pre-compact.sh), [`hooks/post-compact.sh`](hooks/post-compact.sh)  
+**Hooks:** `PreCompact`, `PostCompact`
+
+Measures how many tokens were freed by a compaction and surfaces the result in the statusline.
+
+**How it works:**
+- `pre-compact.sh` reads the transcript at the moment compaction is triggered, sums all token counts across all messages, and saves a snapshot to `~/.claude/.compaction-pre.json`
+- `post-compact.sh` re-reads the (now compacted) transcript, computes the delta, and writes the result to `~/.claude/.compaction-result.json`
+- `statusline.sh` reads the result and appends a compaction badge when the session matches
+
+**Statusline output after compaction:**
+```
+[claude-sonnet-4-6] in:1200(5000) out:800 cache(r/w):2000/500 ctx:5% cost:$0.12 compact:-45320tok(-72%)
+```
+
+The badge shows absolute tokens freed and the percentage reduction. It persists for the rest of the session until the next compaction.
+
+---
+
+### 4. Git Intent Shortcuts
 
 **Script:** [`hooks/git-intent.sh`](hooks/git-intent.sh)  
 **Hook:** `UserPromptSubmit`
@@ -78,10 +99,10 @@ Prompts not matching these patterns pass through to Claude normally.
 
 ## Installation
 
-### Via marketplace (after pushing to GitHub)
+### Via GitHub (recommended)
 
 ```
-/plugin marketplace add github:lamp/claude-assistant
+/plugin marketplace add lamphamTL/claude-assistant
 /plugin install claude-assistant@claude-assistant
 ```
 
@@ -89,7 +110,7 @@ Then add the statusline to `~/.claude/settings.json` manually (see above).
 
 ### Local development
 
-The repo is pre-registered as a local marketplace in `~/.claude/plugins/known_marketplaces.json`. The symlink `~/.claude/claude-assistant → ~/Documents/Project/claude-assistant` makes hooks active immediately.
+Wire hooks directly in `~/.claude/settings.json` (see above). Local path install is not supported by `/plugin install`.
 
 ---
 
@@ -98,11 +119,13 @@ The repo is pre-registered as a local marketplace in `~/.claude/plugins/known_ma
 ```
 claude-assistant/
 ├── .claude-plugin/
-│   └── plugin.json        # Plugin metadata
-├── hooks/
-│   ├── hooks.json         # Hook event declarations
-│   ├── git-intent.sh      # Git shortcut hook (UserPromptSubmit)
-│   ├── track-tokens.sh    # Token log hook (Stop)
-│   └── statusline.sh      # Live statusline renderer
-└── marketplace.json       # Self-hostable marketplace entry
+│   ├── plugin.json        # Plugin metadata
+│   └── marketplace.json   # Marketplace catalog (self-referencing)
+└── hooks/
+    ├── hooks.json         # Hook event declarations
+    ├── git-intent.sh      # Git shortcut hook (UserPromptSubmit)
+    ├── pre-compact.sh     # Snapshot tokens before compaction (PreCompact)
+    ├── post-compact.sh    # Compute compaction delta (PostCompact)
+    ├── track-tokens.sh    # Token log hook (Stop)
+    └── statusline.sh      # Live statusline renderer
 ```
