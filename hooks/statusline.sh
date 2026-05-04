@@ -42,7 +42,7 @@ if [ -f "$compact_file" ]; then
     reduced=$(jq -r '.reduced // 0' "$compact_file")
     before=$(jq -r '.tokens_before // 0' "$compact_file")
     pct=$(echo "scale=0; $reduced * 100 / $before" | bc 2>/dev/null)
-    compact_info=" ${YELLOW}compact${RESET}:${WHITE}-${reduced}tok(-${pct}%)${RESET}"
+    compact_info=" ${YELLOW}compact${RESET}:${WHITE}-${reduced}tok(-${pct}%%)${RESET}"
   fi
 fi
 
