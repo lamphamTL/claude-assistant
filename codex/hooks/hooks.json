@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CODEX_PLUGIN_ROOT:-.}/hooks/git-intent.sh\"",
+            "statusMessage": "Checking git intent"
+          }
+        ]
+      }
+    ]
+  }
+}

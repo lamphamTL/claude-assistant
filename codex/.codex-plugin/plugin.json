@@ -1,0 +1,30 @@
+{
+  "name": "codex-assistant",
+  "version": "1.0.0",
+  "description": "Git intent shortcuts for Codex",
+  "author": {
+    "name": "lamp"
+  },
+  "keywords": [
+    "codex",
+    "git",
+    "hooks",
+    "productivity"
+  ],
+  "hooks": "./hooks/hooks.json",
+  "interface": {
+    "displayName": "Codex Assistant",
+    "shortDescription": "Git shortcut hooks for Codex",
+    "longDescription": "Intercepts short commit and push prompts in Codex and handles them directly with git commands.",
+    "developerName": "lamp",
+    "category": "Productivity",
+    "capabilities": [
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Commit",
+      "Push",
+      "Commit and push"
+    ]
+  }
+}
