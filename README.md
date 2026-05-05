@@ -31,9 +31,9 @@ ai-plugins/
     ├── README.md
     ├── .codex-plugin/
     │   └── plugin.json
-    └── hooks/
-        ├── git-intent.sh
-        └── hooks.json
+    ├── hooks.json
+    └── scripts/
+        └── git-intent.sh
 ```
 
 ## Plugin Responsibilities

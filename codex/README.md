@@ -6,7 +6,7 @@ A Codex plugin providing git intent shortcuts.
 
 ### Git Intent Shortcuts
 
-**Script:** [`hooks/git-intent.sh`](hooks/git-intent.sh)
+**Script:** [`scripts/git-intent.sh`](scripts/git-intent.sh)
 **Hook:** `UserPromptSubmit`
 
 Intercepts short commit/push prompts and runs the corresponding git commands directly.
@@ -30,7 +30,7 @@ Commit messages are generated from `git diff --staged --stat`, with `wip` as a f
 codex/
 ├── .codex-plugin/
 │   └── plugin.json
-└── hooks/
-    ├── hooks.json
+├── hooks.json
+└── scripts/
     └── git-intent.sh
 ```

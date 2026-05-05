@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CODEX_PLUGIN_ROOT:-.}/hooks/git-intent.sh\"",
+            "command": "bash ./scripts/git-intent.sh",
             "statusMessage": "Checking git intent"
           }
         ]
