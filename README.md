@@ -1,4 +1,4 @@
-# assistant-hooks
+# ai-plugins
 
 This repository contains two independent assistant plugin packages:
 
@@ -10,12 +10,16 @@ The two plugin folders do not share hooks or scripts. Behavior that exists in bo
 ## Repository Layout
 
 ```text
-assistant-hooks/
+ai-plugins/
+├── .agents/
+│   └── plugins/
+│       └── marketplace.json
+├── .claude-plugin/
+│   └── marketplace.json
 ├── claude/
 │   ├── README.md
 │   ├── .claude-plugin/
-│   │   ├── plugin.json
-│   │   └── marketplace.json
+│   │   └── plugin.json
 │   └── hooks/
 │       ├── hooks.json
 │       ├── git-intent.sh
@@ -37,3 +41,18 @@ assistant-hooks/
 The Claude plugin keeps the existing Claude Code workflow helpers: token usage logging, live statusline, compaction analysis, and git intent shortcuts.
 
 The Codex plugin currently contains the Codex version of the git intent shortcut hook. It handles short prompts like `commit`, `push`, and `commit and push` directly from `UserPromptSubmit`.
+
+## Marketplace Installation
+
+Claude installs from the repository-level Claude marketplace and only fetches the Claude plugin paths:
+
+```bash
+claude plugin marketplace add lamphamTL/ai-plugins --sparse .claude-plugin claude
+claude plugin install claude-assistant@ai-plugins
+```
+
+Codex installs from the repository-level Codex marketplace:
+
+```bash
+codex plugin marketplace add lamphamTL/ai-plugins
+```
