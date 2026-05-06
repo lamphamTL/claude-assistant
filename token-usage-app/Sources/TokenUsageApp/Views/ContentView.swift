@@ -41,10 +41,9 @@ struct ContentView: View {
                 .gesture(
                     DragGesture(minimumDistance: 40)
                         .onEnded { value in
-                            if value.translation.width < -40 {
-                                window = window.navigated(by: +1)
-                            } else if value.translation.width > 40 {
-                                window = window.navigated(by: -1)
+                            let direction = value.translation.width < 0 ? 1 : -1
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                window = window.navigated(by: direction)
                             }
                         }
                 )

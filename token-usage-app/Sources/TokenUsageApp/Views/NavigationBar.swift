@@ -5,7 +5,7 @@ struct NavigationBar: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Button { window = window.navigated(by: -1) } label: {
+            Button { withAnimation(.easeInOut(duration: 0.3)) { window = window.navigated(by: -1) } } label: {
                 Image(systemName: "chevron.left")
             }
             .buttonStyle(.plain)
@@ -15,16 +15,18 @@ struct NavigationBar: View {
             Text(window.label)
                 .font(.headline)
                 .lineLimit(1)
+                .contentTransition(.numericText())
+                .animation(.easeInOut(duration: 0.3), value: window.label)
 
             Spacer()
 
-            Button { window = window.navigated(by: +1) } label: {
+            Button { withAnimation(.easeInOut(duration: 0.3)) { window = window.navigated(by: +1) } } label: {
                 Image(systemName: "chevron.right")
             }
             .buttonStyle(.plain)
             .disabled(window.isAtPresent)
 
-            Button("Today") { window = .current(kind: window.kind) }
+            Button("Today") { withAnimation(.easeInOut(duration: 0.3)) { window = .current(kind: window.kind) } }
                 .buttonStyle(.bordered)
                 .font(.callout)
                 .disabled(isCurrentWindow)
