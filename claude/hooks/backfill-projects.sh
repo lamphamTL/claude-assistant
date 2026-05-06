@@ -10,6 +10,15 @@ import json
 import sys
 from pathlib import Path
 
+def project_name(cwd: str) -> str:
+    p = Path(cwd)
+    # Strip worktree path: …/project/.claude/worktrees/<name> → project
+    parts = p.parts
+    for i, part in enumerate(parts):
+        if part == ".claude" and i + 1 < len(parts) and parts[i + 1] == "worktrees":
+            return parts[i - 1]
+    return p.name
+
 PROJECTS_DIR = Path.home() / ".claude/projects"
 USAGE_JSONL  = Path.home() / ".claude/token-usage/usage.jsonl"
 
@@ -32,7 +41,7 @@ for transcript in PROJECTS_DIR.glob("*/*.jsonl"):
                 continue
             cwd = obj.get("cwd")
             if cwd:
-                session_cwd[session_id] = Path(cwd).name
+                session_cwd[session_id] = project_name(cwd)
                 break
     except OSError:
         continue

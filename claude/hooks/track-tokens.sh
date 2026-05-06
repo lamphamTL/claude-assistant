@@ -4,9 +4,12 @@ session_id=$(echo "$input" | jq -r '.session_id // "unknown"')
 transcript=$(echo "$input" | jq -r '.transcript_path // empty')
 model=$(echo "$input" | jq -r '.model.display_name // "unknown"')
 
-# Project: last path component of cwd
+# Project name: strip worktree suffix if present, then take basename
 project=$(echo "$input" | jq -r '.cwd // empty')
 [ -z "$project" ] && project="${CWD:-${PWD:-unknown}}"
+if echo "$project" | grep -q '/.claude/worktrees/'; then
+  project=$(echo "$project" | sed 's|/.claude/worktrees/.*||')
+fi
 project=$(basename "$project")
 
 # ── Compaction tracking (unchanged) ──────────────────────────────────────────
