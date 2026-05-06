@@ -23,6 +23,7 @@ swiftc \
   -target "arm64-apple-macosx$MIN_OS" \
   -framework SwiftUI \
   -framework Charts \
+  -framework ServiceManagement \
   -parse-as-library \
   $SOURCES \
   -o "$BINARY"

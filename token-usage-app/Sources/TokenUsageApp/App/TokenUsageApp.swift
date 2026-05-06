@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import ServiceManagement
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     var panel: NSPanel?
@@ -40,6 +41,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         panel.orderFrontRegardless()
         self.panel = panel
+
+        // Register as login item (idempotent — safe to call every launch)
+        try? SMAppService.mainApp.register()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
