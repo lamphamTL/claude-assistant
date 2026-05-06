@@ -63,6 +63,27 @@ struct BarChartView: View {
         }
     }
 
+    @ViewBuilder
+    private func dayLabel(for date: Date) -> some View {
+        let cal = Calendar.current
+        if cal.isDateInToday(date) {
+            VStack(spacing: 1) {
+                Text("Today")
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .foregroundStyle(.blue)
+            }
+        } else {
+            VStack(spacing: 1) {
+                Text(date.formatted(.dateTime.weekday(.abbreviated)))
+                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.primary.opacity(0.8))
+                Text(date.formatted(.dateTime.day()))
+                    .font(.system(size: 9, weight: .regular, design: .rounded))
+                    .foregroundStyle(.secondary.opacity(0.85))
+            }
+        }
+    }
+
     // Unique projects for stable color mapping
     private var allProjects: [String] {
         Array(Set(chartPoints.map(\.project))).sorted()
@@ -89,9 +110,15 @@ struct BarChartView: View {
                 AxisMarks(values: .stride(by: kind.bucketComponent)) { value in
                     AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                         .foregroundStyle(.primary.opacity(0.08))
-                    AxisValueLabel(format: axisFormat)
-                        .font(.system(size: 10, weight: .medium, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.75))
+                    AxisValueLabel {
+                        if kind == .day, let date = value.as(Date.self) {
+                            dayLabel(for: date)
+                        } else if let date = value.as(Date.self) {
+                            Text(date.formatted(axisFormat))
+                                .font(.system(size: 10, weight: .medium, design: .rounded))
+                                .foregroundStyle(.primary.opacity(0.8))
+                        }
+                    }
                 }
             }
             .chartYAxis {
@@ -101,8 +128,8 @@ struct BarChartView: View {
                     AxisValueLabel {
                         if let cost = value.as(Double.self) {
                             Text(cost, format: .currency(code: "USD").precision(.fractionLength(0)))
-                                .font(.system(size: 9, design: .rounded))
-                                .foregroundStyle(.secondary.opacity(0.6))
+                                .font(.system(size: 10, weight: .medium, design: .rounded))
+                                .foregroundStyle(.primary.opacity(0.8))
                         }
                     }
                 }
