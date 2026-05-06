@@ -49,7 +49,8 @@ while IFS= read -r line; do
 done < "$transcript"
 
 # ── Compute incremental delta since last Stop for this session ────────────────
-state_file=~/.claude/token-usage-state.json
+mkdir -p ~/.claude/token-usage
+state_file=~/.claude/token-usage/state.json
 prev_input=0
 prev_output=0
 prev_cache_write=0
@@ -108,4 +109,4 @@ jq -cn \
   '{ts: $ts, session_id: $sid, model: $model, project: $project,
     tokens: {input: $input, output: $output, cache_write: $cache_write, cache_read: $cache_read},
     cost_usd: $cost}' \
-  >> ~/.claude/token-usage.jsonl
+  >> ~/.claude/token-usage/usage.jsonl

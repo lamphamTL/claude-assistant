@@ -12,7 +12,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 LOG = Path.home() / ".claude/token-usage.log"
-JSONL = Path.home() / ".claude/token-usage.jsonl"
+JSONL = Path.home() / ".claude/token-usage/usage.jsonl"
 
 if not LOG.exists():
     print(f"No {LOG} found, nothing to migrate.")
