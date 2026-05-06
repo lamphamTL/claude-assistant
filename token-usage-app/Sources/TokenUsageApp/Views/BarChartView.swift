@@ -10,9 +10,13 @@ struct ChartPoint: Identifiable {
 }
 
 struct BarChartView: View {
-    let entries: [UsageEntry]          // all entries filtered by project only
+    let entries: [UsageEntry]
     let kind: TimeRangeKind
-    @Binding var scrollDate: Date      // left edge of visible window
+    @Binding var scrollDate: Date
+
+    private static let palette: [Color] = [
+        .blue, .purple, .orange, .teal, .pink, .indigo, .mint
+    ]
 
     private var chartPoints: [ChartPoint] {
         let calendar = Calendar.current
@@ -31,13 +35,10 @@ struct BarChartView: View {
         }
 
         return grouped.flatMap { date, projects in
-            projects.map { projName, agg in
-                ChartPoint(bucketDate: date, project: projName, cost: agg.cost, totalTokens: agg.tokens)
-            }
+            projects.map { ChartPoint(bucketDate: date, project: $0, cost: $1.cost, totalTokens: $1.tokens) }
         }.sorted { $0.bucketDate < $1.bucketDate }
     }
 
-    // Seconds to show at once
     var visibleDuration: TimeInterval {
         switch kind {
         case .day:   return 7  * 24 * 3600
@@ -56,58 +57,71 @@ struct BarChartView: View {
 
     private var axisFormat: Date.FormatStyle {
         switch kind {
-        case .day:   return .dateTime.month(.abbreviated).day()
-        case .week:  return .dateTime.month(.abbreviated).day()
-        case .month: return .dateTime.month(.abbreviated).year()
+        case .day, .week: return .dateTime.month(.abbreviated).day()
+        case .month:      return .dateTime.month(.abbreviated)
         }
     }
 
+    // Unique projects for stable color mapping
+    private var allProjects: [String] {
+        Array(Set(chartPoints.map(\.project))).sorted()
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             Chart(chartPoints) { point in
                 BarMark(
                     x: .value("Time", point.bucketDate, unit: kind.bucketComponent),
-                    y: .value("Cost (USD)", point.cost)
+                    y: .value("Cost", point.cost)
                 )
                 .foregroundStyle(by: .value("Project", point.project))
+                .cornerRadius(3)
             }
+            .chartForegroundStyleScale(
+                domain: allProjects,
+                range: Self.palette.prefix(max(allProjects.count, 1)).map { $0 }
+            )
             .chartScrollableAxes(.horizontal)
             .chartXVisibleDomain(length: visibleDuration)
             .chartScrollPosition(x: $scrollDate)
             .chartXAxis {
                 AxisMarks(values: .stride(by: kind.bucketComponent)) { value in
-                    AxisGridLine()
-                    AxisTick()
+                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                        .foregroundStyle(.primary.opacity(0.08))
                     AxisValueLabel(format: axisFormat)
+                        .font(.system(size: 9, weight: .medium, design: .rounded))
+                        .foregroundStyle(.secondary.opacity(0.7))
                 }
             }
             .chartYAxis {
-                AxisMarks { value in
-                    AxisGridLine()
+                AxisMarks(position: .leading) { value in
+                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                        .foregroundStyle(.primary.opacity(0.08))
                     AxisValueLabel {
                         if let cost = value.as(Double.self) {
-                            Text(cost, format: .currency(code: "USD").precision(.fractionLength(2)))
+                            Text(cost, format: .currency(code: "USD").precision(.fractionLength(0)))
+                                .font(.system(size: 9, design: .rounded))
+                                .foregroundStyle(.secondary.opacity(0.6))
                         }
                     }
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .chartLegend(.hidden)
+            .frame(height: 160)
 
-            Divider()
+            // ── Footer ─────────────────────────────────────────────────
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
+                Text(totalCost, format: .currency(code: "USD").precision(.fractionLength(4)))
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.primary)
 
-            HStack {
-                Label {
-                    Text(totalCost, format: .currency(code: "USD").precision(.fractionLength(4)))
-                        .fontWeight(.semibold)
-                } icon: {
-                    Image(systemName: "dollarsign.circle.fill")
-                        .foregroundStyle(.green)
-                }
                 Spacer()
+
                 Text("\(visibleEntries.count) event\(visibleEntries.count == 1 ? "" : "s")")
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundStyle(.tertiary)
             }
-            .font(.callout)
+            .padding(.top, 2)
         }
     }
 }

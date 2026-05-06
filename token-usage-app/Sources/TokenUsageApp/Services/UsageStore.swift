@@ -13,7 +13,7 @@ final class UsageStore: ObservableObject {
     nonisolated static let defaultURL: URL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent(".claude/token-usage/usage.jsonl")
 
-    init(url: URL = UsageStore.defaultURL) {
+    nonisolated init(url: URL = UsageStore.defaultURL) {
         self.fileURL = url
     }
 
