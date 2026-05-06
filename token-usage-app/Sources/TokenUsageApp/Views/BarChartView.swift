@@ -67,6 +67,9 @@ struct BarChartView: View {
         Array(Set(chartPoints.map(\.project))).sorted()
     }
 
+    @State private var chartWidth: CGFloat = 260
+    @State private var dragStartDate: Date? = nil
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Chart(chartPoints) { point in
@@ -108,6 +111,21 @@ struct BarChartView: View {
             }
             .chartLegend(.hidden)
             .frame(height: 160)
+            .background(GeometryReader { geo in
+                Color.clear.onAppear { chartWidth = geo.size.width }
+                    .onChange(of: geo.size.width) { _, w in chartWidth = w }
+            })
+            .gesture(
+                DragGesture(minimumDistance: 4)
+                    .onChanged { value in
+                        if dragStartDate == nil { dragStartDate = scrollDate }
+                        let secsPerPixel = visibleDuration / Double(chartWidth)
+                        let shifted = (dragStartDate ?? scrollDate)
+                            .addingTimeInterval(-Double(value.translation.width) * secsPerPixel)
+                        scrollDate = shifted
+                    }
+                    .onEnded { _ in dragStartDate = nil }
+            )
 
             // ── Footer ─────────────────────────────────────────────────
             HStack(alignment: .firstTextBaseline, spacing: 0) {
