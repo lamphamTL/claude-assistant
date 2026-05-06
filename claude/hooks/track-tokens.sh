@@ -4,9 +4,10 @@ session_id=$(echo "$input" | jq -r '.session_id // "unknown"')
 transcript=$(echo "$input" | jq -r '.transcript_path // empty')
 model=$(echo "$input" | jq -r '.model.display_name // "unknown"')
 
-# Project: check hook input cwd, then env vars
+# Project: last path component of cwd
 project=$(echo "$input" | jq -r '.cwd // empty')
 [ -z "$project" ] && project="${CWD:-${PWD:-unknown}}"
+project=$(basename "$project")
 
 # ── Compaction tracking (unchanged) ──────────────────────────────────────────
 in_tok=$(echo "$input" | jq -r '.context_window.current_usage.input_tokens // 0')

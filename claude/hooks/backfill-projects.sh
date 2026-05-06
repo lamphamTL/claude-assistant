@@ -32,7 +32,7 @@ for transcript in PROJECTS_DIR.glob("*/*.jsonl"):
                 continue
             cwd = obj.get("cwd")
             if cwd:
-                session_cwd[session_id] = cwd
+                session_cwd[session_id] = Path(cwd).name
                 break
     except OSError:
         continue
