@@ -38,6 +38,16 @@ struct ContentView: View {
                     window: window
                 )
                 .padding(16)
+                .gesture(
+                    DragGesture(minimumDistance: 40)
+                        .onEnded { value in
+                            if value.translation.width < -40 {
+                                window = window.navigated(by: +1)
+                            } else if value.translation.width > 40 {
+                                window = window.navigated(by: -1)
+                            }
+                        }
+                )
             } else {
                 ProgressView("Loading usage data…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

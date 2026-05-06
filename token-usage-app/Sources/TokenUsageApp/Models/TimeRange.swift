@@ -19,7 +19,7 @@ enum TimeRangeKind: String, CaseIterable, Identifiable {
     // How many bars to show at once
     var barCount: Int {
         switch self {
-        case .day:   return 30
+        case .day:   return 7
         case .week:  return 12
         case .month: return 12
         }
