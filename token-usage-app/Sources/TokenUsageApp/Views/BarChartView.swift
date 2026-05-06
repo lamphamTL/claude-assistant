@@ -38,6 +38,14 @@ struct BarChartView: View {
 
     private var totalCost: Double { entries.reduce(0) { $0 + $1.cost_usd } }
 
+    private var axisFormat: Date.FormatStyle {
+        switch window.kind {
+        case .day:   return .dateTime.month(.abbreviated).day()
+        case .week:  return .dateTime.month(.abbreviated).day()
+        case .month: return .dateTime.month(.abbreviated).year()
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Chart(chartPoints) { point in
@@ -49,18 +57,10 @@ struct BarChartView: View {
             }
             .chartXScale(domain: window.start ... window.end)
             .chartXAxis {
-                AxisMarks(
-                    values: window.kind == .month
-                        ? .automatic(desiredCount: 8)
-                        : .stride(by: window.kind.bucketComponent)
-                ) { value in
+                AxisMarks(values: .stride(by: window.kind.bucketComponent)) { value in
                     AxisGridLine()
                     AxisTick()
-                    AxisValueLabel(
-                        format: window.kind == .day
-                            ? .dateTime.hour()
-                            : .dateTime.month(.abbreviated).day()
-                    )
+                    AxisValueLabel(format: axisFormat)
                 }
             }
             .chartYAxis {

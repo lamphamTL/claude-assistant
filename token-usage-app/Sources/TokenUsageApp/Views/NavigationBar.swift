@@ -22,7 +22,7 @@ struct NavigationBar: View {
                 Image(systemName: "chevron.right")
             }
             .buttonStyle(.plain)
-            .disabled(window.end > Date())
+            .disabled(window.isAtPresent)
 
             Button("Today") { window = .current(kind: window.kind) }
                 .buttonStyle(.bordered)
@@ -31,8 +31,5 @@ struct NavigationBar: View {
         }
     }
 
-    private var isCurrentWindow: Bool {
-        let now = Date()
-        return window.start <= now && window.end > now
-    }
+    private var isCurrentWindow: Bool { window.isAtPresent }
 }
