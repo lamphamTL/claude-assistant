@@ -23,7 +23,8 @@ struct BarChartView: View {
         let component = kind.bucketComponent
         var grouped: [Date: [String: (cost: Double, tokens: Int)]] = [:]
 
-        for entry in entries {
+        // Only aggregate entries within the visible window
+        for entry in visibleEntries {
             guard let interval = calendar.dateInterval(of: component, for: entry.ts) else { continue }
             let bucket = interval.start
             let proj = entry.projectDisplayName
@@ -84,16 +85,13 @@ struct BarChartView: View {
                 domain: allProjects,
                 range: Self.palette.prefix(max(allProjects.count, 1)).map { $0 }
             )
-            .chartScrollableAxes(.horizontal)
-            .chartXVisibleDomain(length: visibleDuration)
-            .chartScrollPosition(x: $scrollDate)
             .chartXAxis {
                 AxisMarks(values: .stride(by: kind.bucketComponent)) { value in
                     AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                         .foregroundStyle(.primary.opacity(0.08))
                     AxisValueLabel(format: axisFormat)
-                        .font(.system(size: 9, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary.opacity(0.7))
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundStyle(.primary.opacity(0.75))
                 }
             }
             .chartYAxis {
@@ -109,6 +107,7 @@ struct BarChartView: View {
                     }
                 }
             }
+            .chartXScale(domain: scrollDate ... visibleEnd)
             .chartLegend(.hidden)
             .frame(height: 160)
             .background(GeometryReader { geo in
@@ -120,9 +119,8 @@ struct BarChartView: View {
                     .onChanged { value in
                         if dragStartDate == nil { dragStartDate = scrollDate }
                         let secsPerPixel = visibleDuration / Double(chartWidth)
-                        let shifted = (dragStartDate ?? scrollDate)
+                        scrollDate = (dragStartDate ?? scrollDate)
                             .addingTimeInterval(-Double(value.translation.width) * secsPerPixel)
-                        scrollDate = shifted
                     }
                     .onEnded { _ in dragStartDate = nil }
             )

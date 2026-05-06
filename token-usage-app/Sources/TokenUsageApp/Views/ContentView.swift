@@ -104,7 +104,8 @@ struct ContentView: View {
                 CompactNavigationBar(
                     scrollDate: $scrollDate,
                     kind: selectedKind,
-                    visibleDuration: visibleDuration
+                    visibleDuration: visibleDuration,
+                    minDate: store.entries.first?.ts ?? Date()
                 )
                 .padding(.horizontal, 14)
                 .padding(.bottom, 10)

@@ -4,6 +4,7 @@ struct CompactNavigationBar: View {
     @Binding var scrollDate: Date
     let kind: TimeRangeKind
     let visibleDuration: TimeInterval
+    let minDate: Date   // earliest data point — left arrow clamps here
 
     var body: some View {
         HStack(spacing: 6) {
@@ -55,8 +56,11 @@ struct CompactNavigationBar: View {
         case .week:  step = 7  * 24 * 3600
         case .month: step = 31 * 24 * 3600
         }
+        let newDate = scrollDate.addingTimeInterval(Double(direction) * step)
+        // Going back: block if the window would end before any data exists
+        if direction < 0, newDate.addingTimeInterval(visibleDuration) < minDate { return }
         withAnimation(.easeInOut(duration: 0.25)) {
-            scrollDate = scrollDate.addingTimeInterval(Double(direction) * step)
+            scrollDate = newDate
         }
     }
 
