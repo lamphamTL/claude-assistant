@@ -1,0 +1,69 @@
+#!/bin/bash
+# Build TokenUsageApp into a .app bundle using swiftc directly.
+# Usage: ./build.sh [run]
+
+set -euo pipefail
+
+APP_NAME="TokenUsageApp"
+BUNDLE="$APP_NAME.app"
+SRC_DIR="Sources/TokenUsageApp"
+BUILD_DIR=".build"
+BINARY="$BUILD_DIR/$APP_NAME"
+SDK=$(xcrun --show-sdk-path)
+MIN_OS="14.0"
+
+# Collect all Swift sources
+SOURCES=$(find "$SRC_DIR" -name "*.swift" | sort)
+
+echo "→ Compiling $APP_NAME..."
+mkdir -p "$BUILD_DIR"
+
+swiftc \
+  -sdk "$SDK" \
+  -target "arm64-apple-macosx$MIN_OS" \
+  -framework SwiftUI \
+  -framework Charts \
+  -parse-as-library \
+  $SOURCES \
+  -o "$BINARY"
+
+echo "→ Building app bundle..."
+rm -rf "$BUNDLE"
+mkdir -p "$BUNDLE/Contents/MacOS"
+mkdir -p "$BUNDLE/Contents/Resources"
+
+cp "$BINARY" "$BUNDLE/Contents/MacOS/$APP_NAME"
+
+cat > "$BUNDLE/Contents/Info.plist" << 'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>TokenUsageApp</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.lampham.tokenusage</string>
+    <key>CFBundleName</key>
+    <string>Token Usage</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+</dict>
+</plist>
+PLIST
+
+echo "✓ Built $BUNDLE"
+
+if [[ "${1:-}" == "run" ]]; then
+  echo "→ Launching..."
+  open "$BUNDLE"
+fi
