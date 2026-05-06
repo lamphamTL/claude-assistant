@@ -109,7 +109,7 @@ struct BarChartView: View {
             .chartXAxis {
                 AxisMarks(values: .stride(by: kind.bucketComponent)) { value in
                     AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                        .foregroundStyle(.primary.opacity(0.08))
+                        .foregroundStyle(.primary.opacity(0.18))
                     AxisValueLabel {
                         if kind == .day, let date = value.as(Date.self) {
                             dayLabel(for: date)
@@ -124,12 +124,12 @@ struct BarChartView: View {
             .chartYAxis {
                 AxisMarks(position: .leading) { value in
                     AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                        .foregroundStyle(.primary.opacity(0.08))
+                        .foregroundStyle(.primary.opacity(0.18))
                     AxisValueLabel {
                         if let cost = value.as(Double.self) {
-                            Text(cost, format: .currency(code: "USD").precision(.fractionLength(0)))
+                            Text(String(format: "$%.0f", cost))
                                 .font(.system(size: 10, weight: .medium, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.8))
+                                .foregroundStyle(.white)
                         }
                     }
                 }
@@ -154,7 +154,7 @@ struct BarChartView: View {
 
             // ── Footer ─────────────────────────────────────────────────
             HStack(alignment: .firstTextBaseline, spacing: 0) {
-                Text(totalCost, format: .currency(code: "USD").precision(.fractionLength(4)))
+                Text(String(format: "$%.4f", totalCost))
                     .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundStyle(.primary)
 
