@@ -10,12 +10,13 @@ struct ChartPoint: Identifiable {
 }
 
 struct BarChartView: View {
-    let entries: [UsageEntry]
-    let window: TimeWindow
+    let entries: [UsageEntry]          // all entries filtered by project only
+    let kind: TimeRangeKind
+    @Binding var scrollDate: Date      // left edge of visible window
 
     private var chartPoints: [ChartPoint] {
         let calendar = Calendar.current
-        let component = window.kind.bucketComponent
+        let component = kind.bucketComponent
         var grouped: [Date: [String: (cost: Double, tokens: Int)]] = [:]
 
         for entry in entries {
@@ -36,10 +37,25 @@ struct BarChartView: View {
         }.sorted { $0.bucketDate < $1.bucketDate }
     }
 
-    private var totalCost: Double { entries.reduce(0) { $0 + $1.cost_usd } }
+    // Seconds to show at once
+    var visibleDuration: TimeInterval {
+        switch kind {
+        case .day:   return 7  * 24 * 3600
+        case .week:  return 5  * 7  * 24 * 3600
+        case .month: return 5  * 31 * 24 * 3600
+        }
+    }
+
+    private var visibleEnd: Date { scrollDate.addingTimeInterval(visibleDuration) }
+
+    private var visibleEntries: [UsageEntry] {
+        entries.filter { $0.ts >= scrollDate && $0.ts < visibleEnd }
+    }
+
+    private var totalCost: Double { visibleEntries.reduce(0) { $0 + $1.cost_usd } }
 
     private var axisFormat: Date.FormatStyle {
-        switch window.kind {
+        switch kind {
         case .day:   return .dateTime.month(.abbreviated).day()
         case .week:  return .dateTime.month(.abbreviated).day()
         case .month: return .dateTime.month(.abbreviated).year()
@@ -50,14 +66,16 @@ struct BarChartView: View {
         VStack(alignment: .leading, spacing: 12) {
             Chart(chartPoints) { point in
                 BarMark(
-                    x: .value("Time", point.bucketDate, unit: window.kind.bucketComponent),
+                    x: .value("Time", point.bucketDate, unit: kind.bucketComponent),
                     y: .value("Cost (USD)", point.cost)
                 )
                 .foregroundStyle(by: .value("Project", point.project))
             }
-            .chartXScale(domain: window.start ... window.end)
+            .chartScrollableAxes(.horizontal)
+            .chartXVisibleDomain(length: visibleDuration)
+            .chartScrollPosition(x: $scrollDate)
             .chartXAxis {
-                AxisMarks(values: .stride(by: window.kind.bucketComponent)) { value in
+                AxisMarks(values: .stride(by: kind.bucketComponent)) { value in
                     AxisGridLine()
                     AxisTick()
                     AxisValueLabel(format: axisFormat)
@@ -85,10 +103,8 @@ struct BarChartView: View {
                     Image(systemName: "dollarsign.circle.fill")
                         .foregroundStyle(.green)
                 }
-
                 Spacer()
-
-                Text("\(entries.count) event\(entries.count == 1 ? "" : "s")")
+                Text("\(visibleEntries.count) event\(visibleEntries.count == 1 ? "" : "s")")
                     .foregroundStyle(.secondary)
             }
             .font(.callout)
