@@ -27,14 +27,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             ContentView()
                 .environmentObject(store)
         )
-        hosting.frame = panel.contentRect(forFrameRect: panel.frame)
-        hosting.autoresizingMask = [.width, .height]
+        // Size panel to SwiftUI content height
+        hosting.frame = NSRect(origin: .zero, size: CGSize(width: 320, height: 2000))
         panel.contentView = hosting
+        hosting.layout()
+        let fittingSize = hosting.fittingSize
+        panel.setContentSize(CGSize(width: 320, height: fittingSize.height))
+        hosting.autoresizingMask = [.width, .height]
 
         // Bottom-right corner with margin
         if let screen = NSScreen.main {
             let margin: CGFloat = 24
-            let x = screen.visibleFrame.maxX - panel.frame.width - margin
+            let x = screen.visibleFrame.maxX - 320 - margin
             let y = screen.visibleFrame.minY + margin
             panel.setFrameOrigin(NSPoint(x: x, y: y))
         }

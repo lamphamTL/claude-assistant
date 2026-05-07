@@ -117,7 +117,7 @@ struct BarChartView: View {
     // MARK: - Body
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 4) {
             Chart(chartPoints) { point in
                 BarMark(
                     x: .value("Time", point.bucketDate, unit: kind.bucketComponent),
@@ -161,7 +161,7 @@ struct BarChartView: View {
             }
             .chartXScale(domain: scrollDate.addingTimeInterval(-barDuration / 2) ... visibleEnd.addingTimeInterval(barDuration / 2))
             .chartLegend(.hidden)
-            .frame(height: 160)
+            .frame(height: 150)
             .background(GeometryReader { geo in
                 Color.clear
                     .onAppear { chartWidth = geo.size.width }

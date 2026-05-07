@@ -11,7 +11,7 @@ struct ContentView: View {
         ZStack {
             // Glass background
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(.ultraThinMaterial)
+                .fill(.ultraThinMaterial.opacity(0.5))
                 .overlay(
                     RoundedRectangle(cornerRadius: 22, style: .continuous)
                         .strokeBorder(
@@ -76,8 +76,8 @@ struct ContentView: View {
                     .onHover { isHovering = $0 }
                 }
                 .padding(.horizontal, 14)
-                .padding(.top, 14)
-                .padding(.bottom, 8)
+                .padding(.top, 4)
+                .padding(.bottom, 2)
 
                 // ── Project filter (only if multiple projects) ────────────
                 if !store.knownProjects.isEmpty {
@@ -97,7 +97,7 @@ struct ContentView: View {
                         .labelsHidden()
                     }
                     .padding(.horizontal, 14)
-                    .padding(.bottom, 6)
+                    .padding(.bottom, 4)
                 }
 
                 // ── Nav bar ───────────────────────────────────────────────
@@ -108,7 +108,7 @@ struct ContentView: View {
                     minDate: store.entries.first?.ts ?? Date()
                 )
                 .padding(.horizontal, 14)
-                .padding(.bottom, 10)
+                .padding(.bottom, 4)
 
                 // ── Chart ─────────────────────────────────────────────────
                 if store.isLoaded {
@@ -118,7 +118,7 @@ struct ContentView: View {
                         scrollDate: $scrollDate
                     )
                     .padding(.horizontal, 14)
-                    .padding(.bottom, 14)
+                    .padding(.bottom, 8)
                 } else {
                     ProgressView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
