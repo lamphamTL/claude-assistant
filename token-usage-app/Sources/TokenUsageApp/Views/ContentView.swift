@@ -29,7 +29,7 @@ struct ContentView: View {
             VStack(spacing: 0) {
                 // ── Header ───────────────────────────────────────────────
                 HStack(alignment: .center, spacing: 8) {
-                    Text("Token Usage")
+                    Text("AI Usage")
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(.primary.opacity(0.8))
 

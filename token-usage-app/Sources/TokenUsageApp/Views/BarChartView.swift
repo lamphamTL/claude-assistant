@@ -53,6 +53,14 @@ struct BarChartView: View {
         }
     }
 
+    private var barDuration: TimeInterval {
+        switch kind {
+        case .day:   return 24 * 3600
+        case .week:  return 7  * 24 * 3600
+        case .month: return 31 * 24 * 3600
+        }
+    }
+
     private var visibleEnd: Date { scrollDate.addingTimeInterval(visibleDuration) }
     private var visibleEntries: [UsageEntry] { entries.filter { $0.ts >= scrollDate && $0.ts < visibleEnd } }
     private var totalCost: Double { visibleEntries.reduce(0) { $0 + $1.cost_usd } }
@@ -86,10 +94,10 @@ struct BarChartView: View {
             VStack(spacing: 1) {
                 Text(date.formatted(.dateTime.weekday(.abbreviated)))
                     .font(.system(size: 9, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.primary.opacity(0.8))
+                    .foregroundStyle(.white)
                 Text(date.formatted(.dateTime.day()))
                     .font(.system(size: 9, weight: .regular, design: .rounded))
-                    .foregroundStyle(.secondary.opacity(0.85))
+                    .foregroundStyle(.white.opacity(0.75))
             }
         }
     }
@@ -133,7 +141,7 @@ struct BarChartView: View {
                         } else if let date = value.as(Date.self) {
                             Text(date.formatted(axisFormat))
                                 .font(.system(size: 10, weight: .medium, design: .rounded))
-                                .foregroundStyle(.primary.opacity(0.8))
+                                .foregroundStyle(.white)
                         }
                     }
                 }
@@ -151,7 +159,7 @@ struct BarChartView: View {
                     }
                 }
             }
-            .chartXScale(domain: scrollDate ... visibleEnd)
+            .chartXScale(domain: scrollDate.addingTimeInterval(-barDuration / 2) ... visibleEnd.addingTimeInterval(barDuration / 2))
             .chartLegend(.hidden)
             .frame(height: 160)
             .background(GeometryReader { geo in
@@ -206,7 +214,7 @@ struct BarChartView: View {
 
                 Text(selectedBucket != nil ? "selected" : "\(visibleEntries.count) event\(visibleEntries.count == 1 ? "" : "s")")
                     .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.white.opacity(0.75))
             }
             .animation(.easeInOut(duration: 0.2), value: selectedBucket)
             .padding(.top, 2)
