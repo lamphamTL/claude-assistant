@@ -18,8 +18,6 @@ struct BarChartView: View {
         .blue, .purple, .orange, .teal, .pink, .indigo, .mint
     ]
 
-    @State private var chartWidth: CGFloat = 260
-    @State private var dragStartDate: Date? = nil
     @State private var selectedBucket: Date? = nil
 
     // MARK: - Derived data
@@ -162,11 +160,6 @@ struct BarChartView: View {
             .chartXScale(domain: scrollDate.addingTimeInterval(-barDuration / 2) ... visibleEnd.addingTimeInterval(barDuration / 2))
             .chartLegend(.hidden)
             .frame(height: 150)
-            .background(GeometryReader { geo in
-                Color.clear
-                    .onAppear { chartWidth = geo.size.width }
-                    .onChange(of: geo.size.width) { _, w in chartWidth = w }
-            })
             .chartOverlay { proxy in
                 GeometryReader { geo in
                     Rectangle().fill(.clear).contentShape(Rectangle())
@@ -177,20 +170,8 @@ struct BarChartView: View {
                                 selectedBucket = nil
                                 return
                             }
-                            // Tap same bar → deselect
                             selectedBucket = (selectedBucket == bucket) ? nil : bucket
                         }
-                        .simultaneousGesture(
-                            DragGesture(minimumDistance: 4)
-                                .onChanged { value in
-                                    selectedBucket = nil
-                                    if dragStartDate == nil { dragStartDate = scrollDate }
-                                    let secsPerPixel = visibleDuration / Double(chartWidth)
-                                    scrollDate = (dragStartDate ?? scrollDate)
-                                        .addingTimeInterval(-Double(value.translation.width) * secsPerPixel)
-                                }
-                                .onEnded { _ in dragStartDate = nil }
-                        )
                 }
             }
             .onChange(of: scrollDate) { _, _ in selectedBucket = nil }
