@@ -1,58 +1,76 @@
 # ai-plugins
 
-This repository contains two independent assistant plugin packages:
+Plugins for Claude Code and Codex CLI, plus a native macOS token usage widget.
 
-- [`claude/`](claude/) is the Claude Code plugin.
-- [`codex/`](codex/) is the Codex plugin.
-
-The two plugin folders do not share hooks or scripts. Behavior that exists in both products is intentionally duplicated so each integration can use the hook protocol and install metadata expected by that host.
+- [`claude/`](claude/) — Claude Code plugin
+- [`codex/`](codex/) — Codex CLI plugin
+- [`token-usage-app/`](token-usage-app/) — macOS floating widget to visualise AI spend
 
 ## Repository Layout
 
 ```text
 ai-plugins/
 ├── .agents/
-│   └── plugins/
-│       └── marketplace.json
+│   └── plugins/marketplace.json
 ├── .claude-plugin/
 │   └── marketplace.json
 ├── claude/
-│   ├── README.md
-│   ├── .claude-plugin/
-│   │   └── plugin.json
+│   ├── .claude-plugin/plugin.json
 │   └── hooks/
 │       ├── hooks.json
+│       ├── track-tokens.sh       # writes ~/.claude/token-usage/usage.jsonl
+│       ├── statusline.sh         # live token/cost statusline
 │       ├── git-intent.sh
-│       ├── post-compact.sh
 │       ├── pre-compact.sh
-│       ├── statusline.sh
-│       └── track-tokens.sh
-└── codex/
+│       ├── post-compact.sh
+│       ├── migrate-token-log.sh  # one-time .log → .jsonl migration
+│       └── backfill-projects.sh  # backfill project names from transcripts
+├── codex/
+│   ├── .codex-plugin/plugin.json
+│   ├── hooks.json
+│   └── scripts/git-intent.sh
+└── token-usage-app/
     ├── README.md
-    ├── .codex-plugin/
-    │   └── plugin.json
-    ├── hooks.json
-    └── scripts/
-        └── git-intent.sh
+    ├── build.sh                  # swiftc build script
+    └── Sources/TokenUsageApp/
 ```
 
-## Plugin Responsibilities
+## Components
 
-The Claude plugin keeps the existing Claude Code workflow helpers: token usage logging, live statusline, compaction analysis, and git intent shortcuts.
+### Claude Code plugin
 
-The Codex plugin currently contains the Codex version of the git intent shortcut hook. It handles short prompts like `commit`, `push`, and `commit and push` directly from `UserPromptSubmit`.
+Token usage logging, live statusline, compaction tracking, git intent shortcuts.
+
+Hooks fire on `Stop`, `UserPromptSubmit`, `PreCompact`, and `PostCompact`. Each `Stop` appends an incremental JSONL entry to `~/.claude/token-usage/usage.jsonl` with timestamp, session ID, model, project name, per-type token deltas, and cost in USD.
+
+### Codex plugin
+
+Git intent shortcut hook (`UserPromptSubmit`) — handles short prompts like `commit`, `push`, and `commit and push`.
+
+### Token Usage App
+
+Native macOS floating widget built with SwiftUI + Swift Charts. Reads `~/.claude/token-usage/usage.jsonl` and renders cost over time as a bar chart.
+
+See [`token-usage-app/README.md`](token-usage-app/README.md) for details and build instructions.
 
 ## Marketplace Installation
 
-Claude installs from the repository-level Claude marketplace and only fetches the Claude plugin paths:
-
+**Claude Code:**
 ```bash
 claude plugin marketplace add lamphamTL/ai-plugins --sparse .claude-plugin claude
 claude plugin install claude-assistant@ai-plugins
 ```
 
-Codex installs from the repository-level Codex marketplace:
-
+**Codex:**
 ```bash
 codex plugin marketplace add lamphamTL/ai-plugins
+```
+
+## Updating the Claude plugin after hook changes
+
+The marketplace sparse clone doesn't auto-pull on reinstall:
+```bash
+git -C ~/.claude/plugins/marketplaces/ai-plugins pull
+claude plugins uninstall claude-assistant@ai-plugins
+claude plugins install claude-assistant@ai-plugins
 ```
