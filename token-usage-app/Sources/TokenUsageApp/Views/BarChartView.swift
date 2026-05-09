@@ -2,7 +2,7 @@ import SwiftUI
 import Charts
 
 struct ChartPoint: Identifiable {
-    let id = UUID()
+    var id: String { "\(bucketDate.timeIntervalSinceReferenceDate)-\(project)" }
     let bucketDate: Date
     let project: String
     let cost: Double
@@ -38,9 +38,16 @@ struct BarChartView: View {
             )
         }
 
-        return grouped.flatMap { date, projects in
-            projects.map { ChartPoint(bucketDate: date, project: $0, cost: $1.cost, totalTokens: $1.tokens) }
-        }.sorted { $0.bucketDate < $1.bucketDate }
+        var points: [ChartPoint] = []
+        for (date, projects) in grouped {
+            for (proj, agg) in projects {
+                points.append(ChartPoint(bucketDate: date, project: proj, cost: agg.cost, totalTokens: agg.tokens))
+            }
+        }
+        points.sort {
+            $0.bucketDate == $1.bucketDate ? $0.project < $1.project : $0.bucketDate < $1.bucketDate
+        }
+        return points
     }
 
     var visibleDuration: TimeInterval {
@@ -100,16 +107,30 @@ struct BarChartView: View {
         }
     }
 
-    private func bucketDate(from location: CGPoint, proxy: ChartProxy, geo: GeometryProxy) -> Date? {
+    // Returns the bucket the tap lands on, or nil if tap misses all bars.
+    private func hitBucket(at location: CGPoint, proxy: ChartProxy, geo: GeometryProxy) -> Date? {
         guard let frame = proxy.plotFrame else { return nil }
-        let xInPlot = location.x - geo[frame].origin.x
-        return proxy.value(atX: xInPlot, as: Date.self)
-    }
+        let origin = geo[frame].origin
+        let xInPlot = location.x - origin.x
+        let yInPlot = location.y - origin.y
 
-    private func nearestBucket(to date: Date) -> Date? {
-        chartPoints
-            .min { abs($0.bucketDate.timeIntervalSince(date)) < abs($1.bucketDate.timeIntervalSince(date)) }
-            .map { $0.bucketDate }
+        guard let clickedDate = proxy.value(atX: xInPlot, as: Date.self),
+              let clickedCost = proxy.value(atY: yInPlot, as: Double.self),
+              clickedCost >= 0
+        else { return nil }
+
+        // Calendar containment: which bucket period does the clicked date fall in?
+        let cal = Calendar.current
+        guard let interval = cal.dateInterval(of: kind.bucketComponent, for: clickedDate) else { return nil }
+        let bucketStart = interval.start
+
+        // Bucket must exist in visible data
+        let bucketTotal = chartPoints
+            .filter { $0.bucketDate == bucketStart }
+            .reduce(0.0) { $0 + $1.cost }
+        guard bucketTotal > 0, clickedCost <= bucketTotal else { return nil }
+
+        return bucketStart
     }
 
     // MARK: - Body
@@ -164,13 +185,11 @@ struct BarChartView: View {
                 GeometryReader { geo in
                     Rectangle().fill(.clear).contentShape(Rectangle())
                         .onTapGesture { location in
-                            guard let date = bucketDate(from: location, proxy: proxy, geo: geo),
-                                  let bucket = nearestBucket(to: date)
-                            else {
+                            if let bucket = hitBucket(at: location, proxy: proxy, geo: geo) {
+                                selectedBucket = (selectedBucket == bucket) ? nil : bucket
+                            } else {
                                 selectedBucket = nil
-                                return
                             }
-                            selectedBucket = (selectedBucket == bucket) ? nil : bucket
                         }
                 }
             }
