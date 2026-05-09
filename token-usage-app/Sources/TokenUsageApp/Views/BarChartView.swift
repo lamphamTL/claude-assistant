@@ -77,6 +77,13 @@ struct BarChartView: View {
         return matching.isEmpty ? nil : matching.reduce(0) { $0 + $1.cost }
     }
 
+    private var selectedEntryCount: Int? {
+        guard let bucket = selectedBucket,
+              let interval = Calendar.current.dateInterval(of: kind.bucketComponent, for: bucket)
+        else { return nil }
+        return visibleEntries.filter { $0.ts >= interval.start && $0.ts < interval.end }.count
+    }
+
     private var allProjects: [String] { Array(Set(chartPoints.map(\.project))).sorted() }
 
     private var axisFormat: Date.FormatStyle {
@@ -212,7 +219,10 @@ struct BarChartView: View {
 
                 Spacer()
 
-                Text(selectedBucket != nil ? "selected" : "\(visibleEntries.count) event\(visibleEntries.count == 1 ? "" : "s")")
+                Text({
+                    let count = selectedBucket != nil ? (selectedEntryCount ?? 0) : visibleEntries.count
+                    return "\(count) event\(count == 1 ? "" : "s")"
+                }())
                     .font(.system(size: 10, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.75))
             }
