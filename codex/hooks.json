@@ -10,6 +10,26 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ./scripts/track-tokens.sh",
+            "statusMessage": "Tracking tokens"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ./scripts/statusline.sh",
+            "statusMessage": "Showing usage"
+          }
+        ]
+      }
     ]
   }
 }

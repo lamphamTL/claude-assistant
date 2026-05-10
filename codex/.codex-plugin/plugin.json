@@ -1,7 +1,7 @@
 {
   "name": "codex-assistant",
   "version": "1.0.0",
-  "description": "Git intent shortcuts for Codex",
+  "description": "Token usage tracking, cost statusline, and git intent shortcuts for Codex",
   "author": {
     "name": "lamp"
   },
@@ -13,8 +13,8 @@
   ],
   "interface": {
     "displayName": "Codex Assistant",
-    "shortDescription": "Git shortcut hooks for Codex",
-    "longDescription": "Intercepts short commit and push prompts in Codex and handles them directly with git commands.",
+    "shortDescription": "Token tracking, cost statusline, and git shortcuts for Codex",
+    "longDescription": "Tracks token usage and cost per turn via Stop hook, shows a colored cost statusline after each response, and intercepts short commit/push prompts in Codex.",
     "developerName": "lamp",
     "category": "Productivity",
     "capabilities": [
