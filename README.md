@@ -10,10 +10,6 @@ Plugins for Claude Code and Codex CLI, plus a native macOS token usage widget.
 
 ```text
 ai-plugins/
-├── .agents/
-│   └── plugins/marketplace.json
-├── .claude-plugin/
-│   └── marketplace.json
 ├── claude/
 │   ├── .claude-plugin/plugin.json
 │   └── hooks/
@@ -28,10 +24,14 @@ ai-plugins/
 ├── codex/
 │   ├── .codex-plugin/plugin.json
 │   ├── hooks.json
-│   └── scripts/git-intent.sh
+│   └── scripts/
+│       ├── git-intent.sh
+│       ├── track-tokens.sh       # writes ~/.codex/token-usage/usage.jsonl
+│       └── statusline.sh         # session cost summary after each turn
 └── token-usage-app/
     ├── README.md
     ├── build.sh                  # swiftc build script
+    ├── resources/                # screenshots
     └── Sources/TokenUsageApp/
 ```
 
@@ -45,11 +45,13 @@ Hooks fire on `Stop`, `UserPromptSubmit`, `PreCompact`, and `PostCompact`. Each 
 
 ### Codex plugin
 
-Git intent shortcut hook (`UserPromptSubmit`) — handles short prompts like `commit`, `push`, and `commit and push`.
+Token usage logging, session cost statusline, and git intent shortcuts.
+
+Hooks fire on `Stop` and `UserPromptSubmit`. Each `Stop` reads the session transcript JSONL, computes incremental token deltas, and appends an entry to `~/.codex/token-usage/usage.jsonl`. A colored cost summary is printed to the console after each turn.
 
 ### Token Usage App
 
-Native macOS floating widget built with SwiftUI + Swift Charts. Reads `~/.claude/token-usage/usage.jsonl` and renders cost over time as a bar chart.
+Native macOS floating widget built with SwiftUI + Swift Charts. Reads from both `~/.claude/token-usage/usage.jsonl` and `~/.codex/token-usage/usage.jsonl` and renders cost over time as a bar chart with source filtering (All / Claude / Codex).
 
 See [`token-usage-app/README.md`](token-usage-app/README.md) for details and build instructions.
 
@@ -66,11 +68,20 @@ claude plugin install claude-assistant@ai-plugins
 codex plugin marketplace add lamphamTL/ai-plugins
 ```
 
-## Updating the Claude plugin after hook changes
+## Updating plugins after hook changes
 
-The marketplace sparse clone doesn't auto-pull on reinstall:
+The marketplace sparse clone doesn't auto-pull on reinstall.
+
+**Claude Code:**
 ```bash
 git -C ~/.claude/plugins/marketplaces/ai-plugins pull
 claude plugins uninstall claude-assistant@ai-plugins
 claude plugins install claude-assistant@ai-plugins
+```
+
+**Codex:**
+```bash
+git -C ~/.codex/plugins/marketplaces/ai-plugins pull
+codex plugins uninstall codex-assistant@ai-plugins
+codex plugins install codex-assistant@ai-plugins
 ```
