@@ -2,20 +2,13 @@
 
 A native macOS floating widget that visualises Claude Code and Codex token costs over time, reading live from both `~/.claude/token-usage/usage.jsonl` and `~/.codex/token-usage/usage.jsonl`.
 
-![Token Usage App screenshot](resources/Screenshot%202026-05-09%20at%2000.50.25.png)
+| All sources | Claude only | Codex only |
+|:-----------:|:-----------:|:----------:|
+| ![All usage](resources/all-usage.png) | ![Claude usage](resources/claude-usage.png) | ![Codex usage](resources/codex-usage.png) |
 
 ## Features
 
-- **Bar chart** of cost (USD) per day, week, or month
-- **Source picker** — filter between All, Claude, and Codex usage
-- **Day / Week / Month** range selector — 7 daily bars, 5 weekly bars, 5 monthly bars
-- **Prev / Next arrows** to navigate through time; "Now" button to jump back to the present
-- **Per-project filter** — breakdown by repo/working directory, scoped to the selected source
-- **Tap a bar** to pin its cost in the footer; tap again to deselect
-- **Live updates** — file-watches both `usage.jsonl` files and refreshes within ~1 s
-- **Floating panel** — always on top of other windows, shows on all Spaces and fullscreen apps
-- **Draggable** — click and drag from any empty area to reposition
-- **Login item** — registers itself at first launch via `SMAppService`; appears in System Settings → General → Login Items
+Visualise AI spending (USD) across Claude and Codex sessions. Filter by tool (Claude / Codex), project, and timeframe (day / week / month).
 
 ## Requirements
 
@@ -68,3 +61,12 @@ Written by the `track-tokens.sh` Stop hook in the Codex plugin. Token data is so
 ```
 
 Values are incremental deltas per assistant turn, not cumulative session totals.
+
+## Pricing sources
+
+Cost is computed by the hook scripts using published rates at time of writing.
+
+| Provider | Pricing page |
+|----------|-------------|
+| Anthropic (Claude) | https://www.anthropic.com/pricing#api |
+| OpenAI (Codex / GPT) | https://developers.openai.com/api/docs/pricing |
