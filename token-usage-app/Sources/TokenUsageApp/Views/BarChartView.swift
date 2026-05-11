@@ -14,10 +14,13 @@ struct ChartPoint: Identifiable {
 struct ChartData {
     let points: [ChartPoint]
     let totalCost: Double
+    let totalCredits: Double        // 0 for Claude (no credits field)
     let totalEntries: Int
-    let bucketCounts: [Date: Int]   // entry count per bucket for footer
+    let bucketCounts: [Date: Int]
+    let bucketCredits: [Date: Double]
 
-    static let empty = ChartData(points: [], totalCost: 0, totalEntries: 0, bucketCounts: [:])
+    static let empty = ChartData(points: [], totalCost: 0, totalCredits: 0,
+                                 totalEntries: 0, bucketCounts: [:], bucketCredits: [:])
 }
 
 struct BarChartView: View {
@@ -25,6 +28,7 @@ struct BarChartView: View {
     let kind: TimeRangeKind
     let scrollDate: Date            // for x-axis domain
     @Binding var scrollDateBinding: Date
+    var showCredits: Bool = false
 
     private static let palette: [Color] = [
         .blue, .purple, .orange, .teal, .pink, .indigo, .mint
@@ -166,19 +170,30 @@ struct BarChartView: View {
             .onChange(of: kind)       { _, _ in selectedBucket = nil }
 
             // ── Footer ─────────────────────────────────────────────────
-            HStack(alignment: .firstTextBaseline, spacing: 0) {
-                let displayCost = selectedCost ?? data.totalCost
-                Text(String(format: "$%.4f", displayCost))
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.primary)
-                    .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .leading)))
+            ZStack(alignment: .center) {
+                // Left and right anchored items
+                HStack(alignment: .firstTextBaseline, spacing: 0) {
+                    let displayCost = selectedCost ?? data.totalCost
+                    Text(String(format: "$%.4f", displayCost))
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.primary)
+                        .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .leading)))
 
-                Spacer()
+                    Spacer()
 
-                let count = selectedBucket.flatMap { data.bucketCounts[$0] } ?? data.totalEntries
-                Text("\(count) event\(count == 1 ? "" : "s")")
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.75))
+                    let count = selectedBucket.flatMap { data.bucketCounts[$0] } ?? data.totalEntries
+                    Text("\(count) event\(count == 1 ? "" : "s")")
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.75))
+                }
+
+                // Credits — centered, Codex only
+                if showCredits {
+                    let displayCredits = selectedBucket.flatMap { data.bucketCredits[$0] } ?? data.totalCredits
+                    Text(String(format: "%.2f cr", displayCredits))
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundStyle(.yellow.opacity(0.85))
+                }
             }
             .animation(.easeInOut(duration: 0.2), value: selectedBucket)
             .padding(.top, 2)

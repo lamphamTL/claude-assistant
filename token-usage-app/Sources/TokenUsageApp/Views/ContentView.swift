@@ -179,7 +179,8 @@ struct ContentView: View {
                         data: chartData,
                         kind: selectedKind,
                         scrollDate: scrollDate,
-                        scrollDateBinding: $scrollDate
+                        scrollDateBinding: $scrollDate,
+                        showCredits: selectedSource == "codex"
                     )
                     .padding(.horizontal, 14)
                     .padding(.bottom, 8)
@@ -244,6 +245,7 @@ struct ContentView: View {
 
         var grouped: [Date: [String: (cost: Double, tokens: Int, source: String)]] = [:]
         var bucketCounts: [Date: Int] = [:]
+        var bucketCredits: [Date: Double] = [:]
 
         for entry in visible {
             guard let interval = calendar.dateInterval(of: component, for: entry.ts) else { continue }
@@ -257,6 +259,7 @@ struct ContentView: View {
                 source: entry.source
             )
             bucketCounts[bucket, default: 0] += 1
+            if let cr = entry.credits { bucketCredits[bucket, default: 0] += cr }
         }
 
         var points: [ChartPoint] = []
@@ -271,8 +274,10 @@ struct ContentView: View {
         return ChartData(
             points: points,
             totalCost: visible.reduce(0) { $0 + $1.cost_usd },
+            totalCredits: visible.compactMap(\.credits).reduce(0, +),
             totalEntries: visible.count,
-            bucketCounts: bucketCounts
+            bucketCounts: bucketCounts,
+            bucketCredits: bucketCredits
         )
     }
 
