@@ -5,7 +5,10 @@ struct ContentView: View {
     @State private var selectedKind: TimeRangeKind = .week
     @State private var scrollDate: Date = Self.initialScrollDate(for: .week)
     @State private var selectedProject: String? = nil
+    @State private var selectedSource: String? = nil
     @State private var isHovering = false
+
+    private let sources = [("All", String?.none), ("Claude", "claude"), ("Codex", "codex")]
 
     var body: some View {
         ZStack {
@@ -79,15 +82,44 @@ struct ContentView: View {
                 .padding(.top, 4)
                 .padding(.bottom, 2)
 
+                // ── Source picker ─────────────────────────────────────────
+                HStack(spacing: 2) {
+                    ForEach(sources, id: \.0) { label, value in
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectedSource = value
+                                selectedProject = nil
+                            }
+                        } label: {
+                            Text(label)
+                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(
+                                    selectedSource == value
+                                        ? Color.primary.opacity(0.12)
+                                        : Color.clear,
+                                    in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(selectedSource == value ? .primary : .secondary)
+                    }
+                }
+                .padding(3)
+                .background(.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .padding(.horizontal, 14)
+                .padding(.bottom, 4)
+
                 // ── Project filter (only if multiple projects) ────────────
-                if !store.knownProjects.isEmpty {
+                if !sourceFilteredProjects.isEmpty {
                     HStack {
                         Image(systemName: "folder")
                             .font(.system(size: 10))
                             .foregroundStyle(.tertiary)
                         Picker("", selection: $selectedProject) {
                             Text("All projects").tag(String?.none)
-                            ForEach(store.knownProjects, id: \.self) { path in
+                            ForEach(sourceFilteredProjects, id: \.self) { path in
                                 Text(URL(fileURLWithPath: path).lastPathComponent)
                                     .tag(Optional(path))
                             }
@@ -113,7 +145,7 @@ struct ContentView: View {
                 // ── Chart ─────────────────────────────────────────────────
                 if store.isLoaded {
                     BarChartView(
-                        entries: projectFilteredEntries,
+                        entries: filteredEntries,
                         kind: selectedKind,
                         scrollDate: $scrollDate
                     )
@@ -138,9 +170,18 @@ struct ContentView: View {
         }
     }
 
-    private var projectFilteredEntries: [UsageEntry] {
-        guard let proj = selectedProject else { return store.entries }
-        return store.entries.filter { $0.project == proj }
+    private var filteredEntries: [UsageEntry] {
+        store.entries.filter { entry in
+            (selectedProject == nil || entry.project == selectedProject)
+            && (selectedSource == nil || entry.source == selectedSource)
+        }
+    }
+
+    private var sourceFilteredProjects: [String] {
+        let sourceEntries = selectedSource == nil ? store.entries : store.entries.filter { $0.source == selectedSource }
+        return Array(Set(sourceEntries.map(\.project)))
+            .filter { $0 != "unknown" }
+            .sorted { URL(fileURLWithPath: $0).lastPathComponent < URL(fileURLWithPath: $1).lastPathComponent }
     }
 
     private static func initialScrollDate(for kind: TimeRangeKind) -> Date {

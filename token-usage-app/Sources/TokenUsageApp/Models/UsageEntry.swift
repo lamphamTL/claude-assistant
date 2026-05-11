@@ -3,10 +3,11 @@ import Foundation
 struct TokenBreakdown: Decodable, Hashable {
     let input: Int
     let output: Int
-    let cache_write: Int
+    let cache_write: Int?   // Claude only
     let cache_read: Int
+    let reasoning: Int?     // Codex only
 
-    var total: Int { input + output + cache_write + cache_read }
+    var total: Int { input + output + (cache_write ?? 0) + cache_read + (reasoning ?? 0) }
 }
 
 struct UsageEntry: Decodable, Identifiable {
@@ -16,8 +17,13 @@ struct UsageEntry: Decodable, Identifiable {
     let project: String
     let tokens: TokenBreakdown
     let cost_usd: Double
+    var source: String = "claude"   // injected by UsageStore after decode
 
-    var id: String { "\(ts.timeIntervalSince1970)-\(session_id)" }
+    enum CodingKeys: String, CodingKey {
+        case ts, session_id, model, project, tokens, cost_usd
+    }
+
+    var id: String { "\(ts.timeIntervalSince1970)-\(session_id)-\(source)" }
 
     var projectDisplayName: String {
         guard project != "unknown" else { return "Unknown" }

@@ -6,41 +6,53 @@ final class UsageStore: ObservableObject {
     @Published private(set) var entries: [UsageEntry] = []
     @Published private(set) var isLoaded = false
 
-    private let fileURL: URL
-    private var watcher: FileWatcher?
-    private var lineBuffer = ""
+    private var claudeWatcher: FileWatcher?
+    private var codexWatcher: FileWatcher?
+    private var claudeLineBuffer = ""
+    private var codexLineBuffer = ""
 
-    nonisolated static let defaultURL: URL = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".claude/token-usage/usage.jsonl")
+    nonisolated static let home = FileManager.default.homeDirectoryForCurrentUser
 
-    nonisolated init(url: URL = UsageStore.defaultURL) {
-        self.fileURL = url
-    }
+    nonisolated init() {}
+    nonisolated static let claudeURL: URL = home.appendingPathComponent(".claude/token-usage/usage.jsonl")
+    nonisolated static let codexURL:  URL = home.appendingPathComponent(".codex/token-usage/usage.jsonl")
 
     func load() {
-        let watcher = FileWatcher(url: fileURL)
-        watcher.onNewData = { [weak self] data in
-            Task { @MainActor [weak self] in self?.ingest(data: data) }
+        let cw = FileWatcher(url: UsageStore.claudeURL)
+        cw.onNewData = { [weak self] data in
+            Task { @MainActor [weak self] in self?.ingest(data: data, source: "claude") }
         }
-        let initial = watcher.start()
-        self.watcher = watcher
-        ingest(data: initial)
+        let claudeInitial = cw.start()
+        claudeWatcher = cw
+
+        let dw = FileWatcher(url: UsageStore.codexURL)
+        dw.onNewData = { [weak self] data in
+            Task { @MainActor [weak self] in self?.ingest(data: data, source: "codex") }
+        }
+        let codexInitial = dw.start()
+        codexWatcher = dw
+
+        ingest(data: claudeInitial, source: "claude")
+        ingest(data: codexInitial, source: "codex")
         isLoaded = true
     }
 
-    private func ingest(data: Data) {
+    private func ingest(data: Data, source: String) {
         guard !data.isEmpty, let chunk = String(data: data, encoding: .utf8) else { return }
 
-        let combined = lineBuffer + chunk
+        let combined = (source == "claude" ? claudeLineBuffer : codexLineBuffer) + chunk
         var lines = combined.components(separatedBy: "\n")
-        lineBuffer = lines.removeLast()
+        let remainder = lines.removeLast()
+        if source == "claude" { claudeLineBuffer = remainder } else { codexLineBuffer = remainder }
 
         let decoder = JSONDecoder.usageDecoder
         let newEntries = lines
             .filter { !$0.isEmpty }
             .compactMap { line -> UsageEntry? in
-                guard let d = line.data(using: .utf8) else { return nil }
-                return try? decoder.decode(UsageEntry.self, from: d)
+                guard let d = line.data(using: .utf8),
+                      var entry = try? decoder.decode(UsageEntry.self, from: d) else { return nil }
+                entry.source = source
+                return entry
             }
 
         guard !newEntries.isEmpty else { return }
@@ -57,10 +69,11 @@ final class UsageStore: ObservableObject {
             }
     }
 
-    func filteredEntries(window: TimeWindow, project: String?) -> [UsageEntry] {
+    func filteredEntries(window: TimeWindow, project: String?, source: String?) -> [UsageEntry] {
         entries.filter { entry in
             guard entry.ts >= window.start && entry.ts < window.end else { return false }
-            if let proj = project { return entry.project == proj }
+            if let proj = project, entry.project != proj { return false }
+            if let src  = source,  entry.source  != src  { return false }
             return true
         }
     }

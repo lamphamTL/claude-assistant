@@ -2,9 +2,10 @@ import SwiftUI
 import Charts
 
 struct ChartPoint: Identifiable {
-    var id: String { "\(bucketDate.timeIntervalSinceReferenceDate)-\(project)" }
+    var id: String { "\(bucketDate.timeIntervalSinceReferenceDate)-\(project)-\(source)" }
     let bucketDate: Date
     let project: String
+    let source: String
     let cost: Double
     let totalTokens: Int
 }
@@ -22,26 +23,33 @@ struct BarChartView: View {
 
     // MARK: - Derived data
 
+    // When multiple sources present, group by "project (source)" for distinct colors.
+    private var multiSource: Bool {
+        Set(visibleEntries.map(\.source)).count > 1
+    }
+
     private var chartPoints: [ChartPoint] {
         let calendar = Calendar.current
         let component = kind.bucketComponent
-        var grouped: [Date: [String: (cost: Double, tokens: Int)]] = [:]
+        var grouped: [Date: [String: (cost: Double, tokens: Int, source: String)]] = [:]
 
         for entry in visibleEntries {
             guard let interval = calendar.dateInterval(of: component, for: entry.ts) else { continue }
             let bucket = interval.start
             let proj = entry.projectDisplayName
-            let prev = grouped[bucket]?[proj] ?? (cost: 0, tokens: 0)
-            grouped[bucket, default: [:]][proj] = (
+            let key = multiSource ? "\(proj) (\(entry.source))" : proj
+            let prev = grouped[bucket]?[key] ?? (cost: 0, tokens: 0, source: entry.source)
+            grouped[bucket, default: [:]][key] = (
                 cost:   prev.cost + entry.cost_usd,
-                tokens: prev.tokens + entry.tokens.total
+                tokens: prev.tokens + entry.tokens.total,
+                source: entry.source
             )
         }
 
         var points: [ChartPoint] = []
         for (date, projects) in grouped {
-            for (proj, agg) in projects {
-                points.append(ChartPoint(bucketDate: date, project: proj, cost: agg.cost, totalTokens: agg.tokens))
+            for (key, agg) in projects {
+                points.append(ChartPoint(bucketDate: date, project: key, source: agg.source, cost: agg.cost, totalTokens: agg.tokens))
             }
         }
         points.sort {
