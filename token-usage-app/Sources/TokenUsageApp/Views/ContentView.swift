@@ -45,7 +45,6 @@ struct ContentView: View {
                                 withAnimation(.easeInOut(duration: 0.25)) {
                                     selectedKind = kind
                                     scrollDate = Self.initialScrollDate(for: kind)
-                                    selectedProject = nil
                                 }
                             } label: {
                                 Text(kind.rawValue)
@@ -88,7 +87,6 @@ struct ContentView: View {
                         Button {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 selectedSource = value
-                                selectedProject = nil
                             }
                         } label: {
                             Text(label)
