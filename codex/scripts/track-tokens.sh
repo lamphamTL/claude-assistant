@@ -5,9 +5,33 @@ transcript=$(echo "$input" | jq -r '.transcript_path // empty')
 model=$(echo "$input" | jq -r '.model // "unknown"')
 cwd=$(echo "$input" | jq -r '.cwd // empty')
 
-# Project name: basename works for both regular and worktree paths
-# (~/.codex/worktrees/<hash>/<project> → <project>)
-project=$(basename "${cwd:-${PWD:-unknown}}")
+# Project name — handle Codex worktrees, Android worktrees, and junk paths
+project=$(python3 - "${cwd:-${PWD:-}}" <<'PYEOF'
+import sys, os
+from pathlib import Path
+cwd = sys.argv[1].rstrip('/') if len(sys.argv) > 1 else ''
+if not cwd:
+    print('unknown'); raise SystemExit
+home = str(Path.home())
+# Codex managed worktrees: ~/.codex/worktrees/<hash>/<project>
+codex_wt = home + '/.codex/worktrees/'
+if cwd.startswith(codex_wt):
+    parts = cwd[len(codex_wt):].split('/', 1)
+    print(parts[1] if len(parts) == 2 else 'unknown'); raise SystemExit
+# Junk paths
+if cwd == home or any(cwd.startswith(home + p) for p in ['/Library/', '/.codex', '/Documents/Codex/']):
+    print('unknown'); raise SystemExit
+# Android-style nested worktrees: <project>/worktree/<type>/<branch>
+if '/worktree/' in cwd:
+    print(os.path.basename(cwd[:cwd.index('/worktree/')])); raise SystemExit
+# Android-style flat worktrees: <project>/worktree_<name>
+base = os.path.basename(cwd)
+if base.startswith('worktree_') or base.startswith('worktree-'):
+    parent = os.path.dirname(cwd)
+    print(os.path.basename(parent) if parent != home else 'unknown'); raise SystemExit
+print(base if base else 'unknown')
+PYEOF
+)
 
 # ── Find transcript if not provided ──────────────────────────────────────────
 if [ -z "$transcript" ] || [ ! -f "$transcript" ]; then
