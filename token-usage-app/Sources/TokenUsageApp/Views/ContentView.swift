@@ -132,6 +132,37 @@ struct ContentView: View {
                     .padding(.bottom, 4)
                 }
 
+                // ── Weekly credit tracker (Codex only) ───────────────────
+                if selectedSource == "codex" {
+                    let used   = store.weeklyCodexCredits
+                    let limit  = 1000.0
+                    let pct    = min(used / limit, 1.0)
+                    let color: Color = pct >= 0.9 ? .red : pct >= 0.7 ? .yellow : .green
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack {
+                            Text("Weekly credits")
+                                .font(.system(size: 10, weight: .medium, design: .rounded))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text(String(format: "%.1f / 1000", used))
+                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                .foregroundStyle(color)
+                        }
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(.primary.opacity(0.08))
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(color.opacity(0.8))
+                                    .frame(width: geo.size.width * pct)
+                            }
+                        }
+                        .frame(height: 4)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 6)
+                }
+
                 // ── Nav bar ───────────────────────────────────────────────
                 CompactNavigationBar(
                     scrollDate: $scrollDate,
@@ -145,16 +176,16 @@ struct ContentView: View {
                 // ── Chart ─────────────────────────────────────────────────
                 if store.isLoaded {
                     BarChartView(
-                        entries: filteredEntries,
+                        data: chartData,
                         kind: selectedKind,
-                        scrollDate: $scrollDate
+                        scrollDate: scrollDate,
+                        scrollDateBinding: $scrollDate
                     )
                     .padding(.horizontal, 14)
                     .padding(.bottom, 8)
                 } else {
                     ProgressView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .padding(.bottom, 14)
                 }
             }
         }
@@ -170,18 +201,89 @@ struct ContentView: View {
         }
     }
 
+    // Source+project filtered slice — uses pre-indexed store caches
     private var filteredEntries: [UsageEntry] {
-        store.entries.filter { entry in
-            (selectedProject == nil || entry.project == selectedProject)
-            && (selectedSource == nil || entry.source == selectedSource)
+        let base: [UsageEntry]
+        if let src = selectedSource {
+            base = store.entriesBySource[src] ?? []
+        } else {
+            base = store.entries
         }
+        guard let proj = selectedProject else { return base }
+        return base.filter { $0.project == proj }
+    }
+
+    // Time-window slice via binary search — O(log n + k)
+    private var visibleEntries: [UsageEntry] {
+        let entries = filteredEntries
+        guard !entries.isEmpty else { return [] }
+        let end = scrollDate.addingTimeInterval(visibleDuration)
+        let lo = lowerBound(entries, target: scrollDate)
+        let hi = lowerBound(entries, target: end)
+        guard lo < hi else { return [] }
+        return Array(entries[lo..<hi])
+    }
+
+    private func lowerBound(_ entries: [UsageEntry], target: Date) -> Int {
+        var lo = 0, hi = entries.count
+        while lo < hi {
+            let mid = (lo + hi) / 2
+            if entries[mid].ts < target { lo = mid + 1 } else { hi = mid }
+        }
+        return lo
+    }
+
+    // Pre-bucketed chart data — only 5-7 ChartPoints passed to BarChartView
+    private var chartData: ChartData {
+        let visible = visibleEntries
+        guard !visible.isEmpty else { return .empty }
+
+        let calendar = Calendar.current
+        let component = selectedKind.bucketComponent
+        let multiSource = Set(visible.map(\.source)).count > 1
+
+        var grouped: [Date: [String: (cost: Double, tokens: Int, source: String)]] = [:]
+        var bucketCounts: [Date: Int] = [:]
+
+        for entry in visible {
+            guard let interval = calendar.dateInterval(of: component, for: entry.ts) else { continue }
+            let bucket = interval.start
+            let proj = entry.projectDisplayName
+            let key = multiSource ? "\(proj) (\(entry.source))" : proj
+            let prev = grouped[bucket]?[key] ?? (cost: 0, tokens: 0, source: entry.source)
+            grouped[bucket, default: [:]][key] = (
+                cost:   prev.cost + entry.cost_usd,
+                tokens: prev.tokens + entry.tokens.total,
+                source: entry.source
+            )
+            bucketCounts[bucket, default: 0] += 1
+        }
+
+        var points: [ChartPoint] = []
+        for (date, projects) in grouped {
+            for (key, agg) in projects {
+                points.append(ChartPoint(bucketDate: date, project: key, source: agg.source,
+                                         cost: agg.cost, totalTokens: agg.tokens))
+            }
+        }
+        points.sort { $0.bucketDate == $1.bucketDate ? $0.project < $1.project : $0.bucketDate < $1.bucketDate }
+
+        return ChartData(
+            points: points,
+            totalCost: visible.reduce(0) { $0 + $1.cost_usd },
+            totalEntries: visible.count,
+            bucketCounts: bucketCounts
+        )
     }
 
     private var sourceFilteredProjects: [String] {
-        let sourceEntries = selectedSource == nil ? store.entries : store.entries.filter { $0.source == selectedSource }
-        return Array(Set(sourceEntries.map(\.project)))
-            .filter { $0 != "unknown" }
-            .sorted { URL(fileURLWithPath: $0).lastPathComponent < URL(fileURLWithPath: $1).lastPathComponent }
+        if let src = selectedSource {
+            return store.projectsBySource[src] ?? []
+        }
+        let all = store.projectsBySource.values.flatMap { $0 }
+        return Array(Set(all)).sorted {
+            URL(fileURLWithPath: $0).lastPathComponent < URL(fileURLWithPath: $1).lastPathComponent
+        }
     }
 
     private static func initialScrollDate(for kind: TimeRangeKind) -> Date {

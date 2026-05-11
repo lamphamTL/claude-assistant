@@ -32,7 +32,7 @@ cd token-usage-app
 
 ### Claude (`~/.claude/token-usage/usage.jsonl`)
 
-Written by the `track-tokens.sh` Stop hook in the Claude Code plugin. Each line:
+Written by the `track-tokens.sh` Stop hook in the Claude Code plugin. `cost_usd` is the **exact value returned by the Claude API** — no estimation involved. Each line:
 
 ```json
 {
@@ -56,17 +56,49 @@ Written by the `track-tokens.sh` Stop hook in the Codex plugin. Token data is so
   "model": "gpt-5.5",
   "project": "ai-plugins",
   "tokens": { "input": 45, "output": 1823, "cache_read": 112074, "reasoning": 342 },
-  "cost_usd": 0.062100
+  "credits": 3.031,
+  "cost_usd": 0.121212
 }
 ```
 
 Values are incremental deltas per assistant turn, not cumulative session totals.
 
+#### How `cost_usd` is computed
+
+The OpenAI API does not return a spend value, so cost is **approximated** from two inputs:
+
+1. **Credit rate card** ([help.openai.com/en/articles/20001106-codex-rate-card](https://help.openai.com/en/articles/20001106-codex-rate-card)) — credits consumed per million tokens per model.
+2. **Credit-to-USD rate** — derived from the assumed plan: **1000 credits/week hard cap** on a **$200/month subscription** ($46.15/week ÷ 1000 credits = **$0.04/credit**). This ratio is confirmed by cross-checking against the published API token prices, which align exactly (e.g. gpt-5.5 input: 125 credits/M × $0.04 = $5.00/M).
+
+Formula (reasoning tokens billed at output rate):
+
+```
+credits  = (input × rate_in + (output + reasoning) × rate_out + cache_read × rate_cache) / 1,000,000
+cost_usd = credits × 0.04
+
+# Example — gpt-5.5, values from the JSON above:
+credits  = (45×125 + (1823+342)×750 + 112074×12.50) / 1,000,000
+         = (5,625 + 1,623,750 + 1,400,925) / 1,000,000
+         = 3.031 credits
+cost_usd = 3.031 × $0.04 = $0.1212
+```
+
+Credit rates per model (credits / 1M tokens, source: Codex rate card):
+
+| Model | Input | Output | Cached input |
+|-------|------:|-------:|-------------:|
+| gpt-5.5 | 125 | 750 | 12.50 |
+| gpt-5.4 | 62.50 | 375 | 6.25 |
+| gpt-5.4-mini | 18.75 | 113 | 1.875 |
+| gpt-5.3-codex | 43.75 | 350 | 4.375 |
+| gpt-5.2 | 43.75 | 350 | 4.375 |
+
+> **Note:** The $0.04/credit rate assumes a specific plan configuration. If your subscription or weekly limit differs, the actual cost per credit will vary.
+
 ## Pricing sources
 
-Cost is computed by the hook scripts using published rates at time of writing.
-
-| Provider | Pricing page |
-|----------|-------------|
-| Anthropic (Claude) | https://www.anthropic.com/pricing#api |
-| OpenAI (Codex / GPT) | https://developers.openai.com/api/docs/pricing |
+| Source | Used for |
+|--------|----------|
+| Claude API response | Claude `cost_usd` — exact, no estimation |
+| [Codex rate card](https://help.openai.com/en/articles/20001106-codex-rate-card) | Codex credit rates per model |
+| [OpenAI API pricing](https://developers.openai.com/api/docs/pricing) | Cross-check: confirms 1 credit = $0.04 |

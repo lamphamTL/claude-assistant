@@ -10,61 +10,27 @@ struct ChartPoint: Identifiable {
     let totalTokens: Int
 }
 
+// Pre-computed chart data passed from ContentView — no raw entries inside BarChartView
+struct ChartData {
+    let points: [ChartPoint]
+    let totalCost: Double
+    let totalEntries: Int
+    let bucketCounts: [Date: Int]   // entry count per bucket for footer
+
+    static let empty = ChartData(points: [], totalCost: 0, totalEntries: 0, bucketCounts: [:])
+}
+
 struct BarChartView: View {
-    let entries: [UsageEntry]
+    let data: ChartData
     let kind: TimeRangeKind
-    @Binding var scrollDate: Date
+    let scrollDate: Date            // for x-axis domain
+    @Binding var scrollDateBinding: Date
 
     private static let palette: [Color] = [
         .blue, .purple, .orange, .teal, .pink, .indigo, .mint
     ]
 
     @State private var selectedBucket: Date? = nil
-
-    // MARK: - Derived data
-
-    // When multiple sources present, group by "project (source)" for distinct colors.
-    private var multiSource: Bool {
-        Set(visibleEntries.map(\.source)).count > 1
-    }
-
-    private var chartPoints: [ChartPoint] {
-        let calendar = Calendar.current
-        let component = kind.bucketComponent
-        var grouped: [Date: [String: (cost: Double, tokens: Int, source: String)]] = [:]
-
-        for entry in visibleEntries {
-            guard let interval = calendar.dateInterval(of: component, for: entry.ts) else { continue }
-            let bucket = interval.start
-            let proj = entry.projectDisplayName
-            let key = multiSource ? "\(proj) (\(entry.source))" : proj
-            let prev = grouped[bucket]?[key] ?? (cost: 0, tokens: 0, source: entry.source)
-            grouped[bucket, default: [:]][key] = (
-                cost:   prev.cost + entry.cost_usd,
-                tokens: prev.tokens + entry.tokens.total,
-                source: entry.source
-            )
-        }
-
-        var points: [ChartPoint] = []
-        for (date, projects) in grouped {
-            for (key, agg) in projects {
-                points.append(ChartPoint(bucketDate: date, project: key, source: agg.source, cost: agg.cost, totalTokens: agg.tokens))
-            }
-        }
-        points.sort {
-            $0.bucketDate == $1.bucketDate ? $0.project < $1.project : $0.bucketDate < $1.bucketDate
-        }
-        return points
-    }
-
-    var visibleDuration: TimeInterval {
-        switch kind {
-        case .day:   return 7  * 24 * 3600
-        case .week:  return 5  * 7  * 24 * 3600
-        case .month: return 5  * 31 * 24 * 3600
-        }
-    }
 
     private var barDuration: TimeInterval {
         switch kind {
@@ -74,25 +40,23 @@ struct BarChartView: View {
         }
     }
 
-    private var visibleEnd: Date { scrollDate.addingTimeInterval(visibleDuration) }
-    private var visibleEntries: [UsageEntry] { entries.filter { $0.ts >= scrollDate && $0.ts < visibleEnd } }
-    private var totalCost: Double { visibleEntries.reduce(0) { $0 + $1.cost_usd } }
+    private var visibleDuration: TimeInterval {
+        switch kind {
+        case .day:   return 7  * 24 * 3600
+        case .week:  return 5  * 7  * 24 * 3600
+        case .month: return 5  * 31 * 24 * 3600
+        }
+    }
 
-    // Cost of the selected bucket (sum across all projects for that bucket)
+    private var visibleEnd: Date { scrollDate.addingTimeInterval(visibleDuration) }
+
     private var selectedCost: Double? {
         guard let bucket = selectedBucket else { return nil }
-        let matching = chartPoints.filter { $0.bucketDate == bucket }
+        let matching = data.points.filter { $0.bucketDate == bucket }
         return matching.isEmpty ? nil : matching.reduce(0) { $0 + $1.cost }
     }
 
-    private var selectedEntryCount: Int? {
-        guard let bucket = selectedBucket,
-              let interval = Calendar.current.dateInterval(of: kind.bucketComponent, for: bucket)
-        else { return nil }
-        return visibleEntries.filter { $0.ts >= interval.start && $0.ts < interval.end }.count
-    }
-
-    private var allProjects: [String] { Array(Set(chartPoints.map(\.project))).sorted() }
+    private var allProjects: [String] { Array(Set(data.points.map(\.project))).sorted() }
 
     private var axisFormat: Date.FormatStyle {
         switch kind {
@@ -100,8 +64,6 @@ struct BarChartView: View {
         case .month:      return .dateTime.month(.abbreviated)
         }
     }
-
-    // MARK: - Helpers
 
     @ViewBuilder
     private func dayLabel(for date: Date) -> some View {
@@ -122,7 +84,6 @@ struct BarChartView: View {
         }
     }
 
-    // Returns the bucket the tap lands on, or nil if tap misses all bars.
     private func hitBucket(at location: CGPoint, proxy: ChartProxy, geo: GeometryProxy) -> Date? {
         guard let frame = proxy.plotFrame else { return nil }
         let origin = geo[frame].origin
@@ -134,25 +95,18 @@ struct BarChartView: View {
               clickedCost >= 0
         else { return nil }
 
-        // Calendar containment: which bucket period does the clicked date fall in?
         let cal = Calendar.current
         guard let interval = cal.dateInterval(of: kind.bucketComponent, for: clickedDate) else { return nil }
         let bucketStart = interval.start
 
-        // Bucket must exist in visible data
-        let bucketTotal = chartPoints
-            .filter { $0.bucketDate == bucketStart }
-            .reduce(0.0) { $0 + $1.cost }
+        let bucketTotal = data.points.filter { $0.bucketDate == bucketStart }.reduce(0.0) { $0 + $1.cost }
         guard bucketTotal > 0, clickedCost <= bucketTotal else { return nil }
-
         return bucketStart
     }
 
-    // MARK: - Body
-
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Chart(chartPoints) { point in
+            Chart(data.points) { point in
                 BarMark(
                     x: .value("Time", point.bucketDate, unit: kind.bucketComponent),
                     y: .value("Cost", point.cost)
@@ -213,24 +167,16 @@ struct BarChartView: View {
 
             // ── Footer ─────────────────────────────────────────────────
             HStack(alignment: .firstTextBaseline, spacing: 0) {
-                if let cost = selectedCost {
-                    Text(String(format: "$%.4f", cost))
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.primary)
-                        .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .leading)))
-                } else {
-                    Text(String(format: "$%.4f", totalCost))
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.primary)
-                        .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .leading)))
-                }
+                let displayCost = selectedCost ?? data.totalCost
+                Text(String(format: "$%.4f", displayCost))
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.primary)
+                    .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .leading)))
 
                 Spacer()
 
-                Text({
-                    let count = selectedBucket != nil ? (selectedEntryCount ?? 0) : visibleEntries.count
-                    return "\(count) event\(count == 1 ? "" : "s")"
-                }())
+                let count = selectedBucket.flatMap { data.bucketCounts[$0] } ?? data.totalEntries
+                Text("\(count) event\(count == 1 ? "" : "s")")
                     .font(.system(size: 10, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.75))
             }

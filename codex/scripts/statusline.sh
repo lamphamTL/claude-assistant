@@ -52,16 +52,21 @@ MAGENTA='\033[35m'
 RED='\033[31m'
 BLUE='\033[34m'
 
-# Cost (session total, reasoning at output rate)
-cost=$(awk -v m="$model" -v i="$in_tok" -v o="$out_tok" -v c="$cached" -v r="$reasoning" '
+# Credits + cost (source: help.openai.com/en/articles/20001106-codex-rate-card)
+# credits/M tokens; reasoning at output rate; 1 credit = $0.04
+credits_and_cost=$(awk -v m="$model" -v i="$in_tok" -v o="$out_tok" -v c="$cached" -v r="$reasoning" '
 BEGIN {
-  if      (m == "gpt-5.5")      { ri=5.00;  ro=30.00; rc=0.50  }
-  else if (m == "gpt-5.4")      { ri=2.50;  ro=15.00; rc=0.25  }
-  else if (m == "gpt-5.4-mini") { ri=0.75;  ro=4.50;  rc=0.075 }
-  else if (m == "gpt-5.4-nano") { ri=0.20;  ro=1.25;  rc=0.02  }
-  else                          { ri=2.50;  ro=15.00; rc=0.25  }
-  printf "%.4f", (i*ri + (o+r)*ro + c*rc) / 1000000
+  if      (m == "gpt-5.5")        { ri=125;   ro=750;  rc=12.50  }
+  else if (m == "gpt-5.4")        { ri=62.50; ro=375;  rc=6.25   }
+  else if (m == "gpt-5.4-mini")   { ri=18.75; ro=113;  rc=1.875  }
+  else if (m == "gpt-5.3-codex")  { ri=43.75; ro=350;  rc=4.375  }
+  else if (m == "gpt-5.2")        { ri=43.75; ro=350;  rc=4.375  }
+  else                            { ri=62.50; ro=375;  rc=6.25   }
+  cr = (i*ri + (o+r)*ro + c*rc) / 1000000
+  printf "%.2f %.4f", cr, cr * 0.04
 }')
+credits=$(echo "$credits_and_cost" | awk '{print $1}')
+cost=$(echo "$credits_and_cost" | awk '{print $2}')
 
 cost_int=$(echo "$cost * 100" | bc | cut -d. -f1)
 if [ "$cost_int" -ge 50 ]; then cost_color=$RED
@@ -74,4 +79,5 @@ printf "${BLUE}in${RESET}:${WHITE}${in_tok}${RESET} "
 printf "${MAGENTA}out${RESET}:${WHITE}${out_tok}${RESET} "
 printf "${CYAN}cache${RESET}:${WHITE}${cached}${RESET} "
 printf "${YELLOW}reason${RESET}:${WHITE}${reasoning}${RESET} "
+printf "${cost_color}credits${RESET}:${WHITE}${credits}${RESET} "
 printf "${cost_color}cost${RESET}:${WHITE}\$${cost}${RESET}\n"

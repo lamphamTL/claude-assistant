@@ -6,13 +6,17 @@ final class UsageStore: ObservableObject {
     @Published private(set) var entries: [UsageEntry] = []
     @Published private(set) var isLoaded = false
 
+    // Pre-indexed caches — updated once when entries change, not on every render
+    @Published private(set) var entriesBySource: [String: [UsageEntry]] = [:]
+    @Published private(set) var projectsBySource: [String: [String]] = [:]
+    @Published private(set) var weeklyCodexCredits: Double = 0
+
     private var claudeWatcher: FileWatcher?
     private var codexWatcher: FileWatcher?
     private var claudeLineBuffer = ""
     private var codexLineBuffer = ""
 
     nonisolated static let home = FileManager.default.homeDirectoryForCurrentUser
-
     nonisolated init() {}
     nonisolated static let claudeURL: URL = home.appendingPathComponent(".claude/token-usage/usage.jsonl")
     nonisolated static let codexURL:  URL = home.appendingPathComponent(".codex/token-usage/usage.jsonl")
@@ -32,9 +36,32 @@ final class UsageStore: ObservableObject {
         let codexInitial = dw.start()
         codexWatcher = dw
 
-        ingest(data: claudeInitial, source: "claude")
-        ingest(data: codexInitial, source: "codex")
-        isLoaded = true
+        // Decode + derive caches entirely off the main thread
+        Task.detached { [weak self] in
+            let decoder = JSONDecoder.usageDecoder
+            func decode(_ data: Data, source: String) -> [UsageEntry] {
+                guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return [] }
+                var lines = text.components(separatedBy: "\n")
+                lines.removeLast()
+                return lines.filter { !$0.isEmpty }.compactMap { line -> UsageEntry? in
+                    guard let d = line.data(using: .utf8),
+                          var e = try? decoder.decode(UsageEntry.self, from: d) else { return nil }
+                    e.source = source
+                    return e
+                }
+            }
+            let all = (decode(claudeInitial, source: "claude") + decode(codexInitial, source: "codex"))
+                .sorted { $0.ts < $1.ts }
+            let derived = UsageStore.buildDerived(from: all)
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.entries             = all
+                self.entriesBySource     = derived.bySource
+                self.projectsBySource    = derived.projects
+                self.weeklyCodexCredits  = derived.weeklyCredits
+                self.isLoaded            = true
+            }
+        }
     }
 
     private func ingest(data: Data, source: String) {
@@ -46,35 +73,51 @@ final class UsageStore: ObservableObject {
         if source == "claude" { claudeLineBuffer = remainder } else { codexLineBuffer = remainder }
 
         let decoder = JSONDecoder.usageDecoder
-        let newEntries = lines
-            .filter { !$0.isEmpty }
-            .compactMap { line -> UsageEntry? in
-                guard let d = line.data(using: .utf8),
-                      var entry = try? decoder.decode(UsageEntry.self, from: d) else { return nil }
-                entry.source = source
-                return entry
-            }
-
+        let newEntries = lines.filter { !$0.isEmpty }.compactMap { line -> UsageEntry? in
+            guard let d = line.data(using: .utf8),
+                  var e = try? decoder.decode(UsageEntry.self, from: d) else { return nil }
+            e.source = source
+            return e
+        }
         guard !newEntries.isEmpty else { return }
         entries.append(contentsOf: newEntries)
         entries.sort { $0.ts < $1.ts }
+        let derived = UsageStore.buildDerived(from: entries)
+        entriesBySource    = derived.bySource
+        projectsBySource   = derived.projects
+        weeklyCodexCredits = derived.weeklyCredits
     }
 
-    var knownProjects: [String] {
-        Array(Set(entries.map(\.project)))
-            .filter { $0 != "unknown" }
-            .sorted {
-                URL(fileURLWithPath: $0).lastPathComponent
-                    < URL(fileURLWithPath: $1).lastPathComponent
+    // MARK: - Derived cache builder (nonisolated — runs off main thread for initial load)
+
+    private struct Derived {
+        let bySource: [String: [UsageEntry]]
+        let projects: [String: [String]]
+        let weeklyCredits: Double
+    }
+
+    nonisolated private static func buildDerived(from entries: [UsageEntry]) -> Derived {
+        var bySource: [String: [UsageEntry]] = [:]
+        var projectSets: [String: Set<String>] = [:]
+
+        for e in entries {
+            bySource[e.source, default: []].append(e)
+            if e.project != "unknown" {
+                projectSets[e.source, default: []].insert(e.project)
             }
-    }
-
-    func filteredEntries(window: TimeWindow, project: String?, source: String?) -> [UsageEntry] {
-        entries.filter { entry in
-            guard entry.ts >= window.start && entry.ts < window.end else { return false }
-            if let proj = project, entry.project != proj { return false }
-            if let src  = source,  entry.source  != src  { return false }
-            return true
         }
+
+        let projects = projectSets.mapValues { set in
+            set.sorted { URL(fileURLWithPath: $0).lastPathComponent < URL(fileURLWithPath: $1).lastPathComponent }
+        }
+
+        let cal = Calendar(identifier: .iso8601)
+        let weekStart = cal.dateInterval(of: .weekOfYear, for: Date())?.start ?? Date()
+        let weeklyCredits = (bySource["codex"] ?? [])
+            .filter { $0.ts >= weekStart }
+            .compactMap(\.credits)
+            .reduce(0, +)
+
+        return Derived(bySource: bySource, projects: projects, weeklyCredits: weeklyCredits)
     }
 }

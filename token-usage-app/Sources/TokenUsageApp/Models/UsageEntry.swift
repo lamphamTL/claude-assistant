@@ -16,11 +16,12 @@ struct UsageEntry: Decodable, Identifiable {
     let model: String
     let project: String
     let tokens: TokenBreakdown
+    let credits: Double?    // Codex only — from credit rate card
     let cost_usd: Double
     var source: String = "claude"   // injected by UsageStore after decode
 
     enum CodingKeys: String, CodingKey {
-        case ts, session_id, model, project, tokens, cost_usd
+        case ts, session_id, model, project, tokens, credits, cost_usd
     }
 
     var id: String { "\(ts.timeIntervalSince1970)-\(session_id)-\(source)" }

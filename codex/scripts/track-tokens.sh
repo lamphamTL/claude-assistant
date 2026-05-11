@@ -88,18 +88,22 @@ else
   echo "$new_state" > "$state_file"
 fi
 
-# ── Cost (reasoning billed at output rate) ────────────────────────────────────
-# Rates USD/million tokens — source: developers.openai.com/api/docs/pricing
-cost=$(awk -v m="$model" -v di="$delta_input" -v do_="$delta_output" \
-          -v dc="$delta_cached" -v dr="$delta_reasoning" '
+# ── Credits + cost (source: help.openai.com/en/articles/20001106-codex-rate-card)
+# credits/M tokens; reasoning billed at output rate; 1 credit = $0.04
+credits_and_cost=$(awk -v m="$model" -v di="$delta_input" -v do_="$delta_output" \
+                       -v dc="$delta_cached" -v dr="$delta_reasoning" '
 BEGIN {
-  if      (m == "gpt-5.5")      { ri=5.00;  ro=30.00; rc=0.50  }
-  else if (m == "gpt-5.4")      { ri=2.50;  ro=15.00; rc=0.25  }
-  else if (m == "gpt-5.4-mini") { ri=0.75;  ro=4.50;  rc=0.075 }
-  else if (m == "gpt-5.4-nano") { ri=0.20;  ro=1.25;  rc=0.02  }
-  else                          { ri=2.50;  ro=15.00; rc=0.25  }
-  printf "%.6f", (di*ri + (do_+dr)*ro + dc*rc) / 1000000
+  if      (m == "gpt-5.5")        { ri=125;   ro=750;  rc=12.50  }
+  else if (m == "gpt-5.4")        { ri=62.50; ro=375;  rc=6.25   }
+  else if (m == "gpt-5.4-mini")   { ri=18.75; ro=113;  rc=1.875  }
+  else if (m == "gpt-5.3-codex")  { ri=43.75; ro=350;  rc=4.375  }
+  else if (m == "gpt-5.2")        { ri=43.75; ro=350;  rc=4.375  }
+  else                            { ri=62.50; ro=375;  rc=6.25   }
+  cr = (di*ri + (do_+dr)*ro + dc*rc) / 1000000
+  printf "%.6f %.6f", cr, cr * 0.04
 }')
+credits=$(echo "$credits_and_cost" | awk '{print $1}')
+cost=$(echo "$credits_and_cost" | awk '{print $2}')
 
 # ── Append JSONL entry ────────────────────────────────────────────────────────
 ts=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
@@ -112,8 +116,9 @@ jq -cn \
   --argjson output "$delta_output" \
   --argjson cache_read "$delta_cached" \
   --argjson reasoning "$delta_reasoning" \
+  --argjson credits "$credits" \
   --argjson cost "$cost" \
   '{ts: $ts, session_id: $sid, model: $model, project: $project,
     tokens: {input: $input, output: $output, cache_read: $cache_read, reasoning: $reasoning},
-    cost_usd: $cost}' \
+    credits: $credits, cost_usd: $cost}' \
   >> ~/.codex/token-usage/usage.jsonl
