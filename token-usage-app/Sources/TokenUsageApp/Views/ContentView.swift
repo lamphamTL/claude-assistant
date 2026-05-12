@@ -216,7 +216,11 @@ struct ContentView: View {
     private var visibleEntries: [UsageEntry] {
         let entries = filteredEntries
         guard !entries.isEmpty else { return [] }
-        let end = scrollDate.addingTimeInterval(visibleDuration)
+        var cal = Calendar.current
+        if selectedKind == .week { cal.firstWeekday = 2 }
+        let end = cal.date(byAdding: selectedKind.bucketComponent,
+                           value: selectedKind.barCount,
+                           to: scrollDate) ?? scrollDate.addingTimeInterval(visibleDuration)
         let lo = lowerBound(entries, target: scrollDate)
         let hi = lowerBound(entries, target: end)
         guard lo < hi else { return [] }
@@ -290,12 +294,6 @@ struct ContentView: View {
     }
 
     private static func initialScrollDate(for kind: TimeRangeKind) -> Date {
-        let duration: TimeInterval
-        switch kind {
-        case .day:   duration = 7  * 24 * 3600
-        case .week:  duration = 5  * 7  * 24 * 3600
-        case .month: duration = 5  * 31 * 24 * 3600
-        }
-        return Date().addingTimeInterval(-duration)
+        TimeWindow.initialScrollDate(for: kind)
     }
 }

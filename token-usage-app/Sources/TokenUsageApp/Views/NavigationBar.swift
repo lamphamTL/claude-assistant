@@ -28,7 +28,7 @@ struct CompactNavigationBar: View {
             if !isAtPresent {
                 Button("Now") {
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        scrollDate = Date().addingTimeInterval(-visibleDuration)
+                        scrollDate = TimeWindow.initialScrollDate(for: kind)
                     }
                 }
                 .font(.system(size: 10, weight: .medium, design: .rounded))
@@ -50,15 +50,13 @@ struct CompactNavigationBar: View {
     }
 
     private func shift(by direction: Int) {
-        let step: TimeInterval
-        switch kind {
-        case .day:   step = 24 * 3600
-        case .week:  step = 7  * 24 * 3600
-        case .month: step = 31 * 24 * 3600
-        }
-        let newDate = scrollDate.addingTimeInterval(Double(direction) * step)
+        var cal = Calendar.current
+        if kind == .week { cal.firstWeekday = 2 }
+        guard let newDate = cal.date(byAdding: kind.bucketComponent, value: direction, to: scrollDate) else { return }
         // Going back: block if the window would end before any data exists
-        if direction < 0, newDate.addingTimeInterval(visibleDuration) < minDate { return }
+        let windowEnd = cal.date(byAdding: kind.bucketComponent, value: kind.barCount, to: newDate)
+            ?? newDate.addingTimeInterval(visibleDuration)
+        if direction < 0, windowEnd < minDate { return }
         withAnimation(.easeInOut(duration: 0.25)) {
             scrollDate = newDate
         }
