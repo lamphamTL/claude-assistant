@@ -1,28 +1,54 @@
 # codex-assistant
 
-A Codex plugin providing git intent shortcuts.
+A Codex plugin providing token usage tracking, a session cost statusline, and configurable prompt dispatch.
 
 ## Features
 
-### Git Intent Shortcuts
+### 1. Token Usage Log
 
-**Script:** [`scripts/git-intent.sh`](scripts/git-intent.sh)
+**Script:** [`scripts/track-tokens.py`](scripts/track-tokens.py)
+**Hook:** `Stop`
+
+Appends an incremental JSONL entry to `~/.codex/token-usage/usage.jsonl` at the end of every turn.
+
+### 2. Session Statusline
+
+**Script:** [`scripts/statusline.py`](scripts/statusline.py)
+**Hook:** `Stop`
+
+Prints a colour-coded cost summary to the console after each turn.
+
+### 3. Prompt Dispatch
+
+**Script:** [`scripts/static-dispatch.py`](scripts/static-dispatch.py)
 **Hook:** `UserPromptSubmit`
 
-Intercepts short commit/push prompts and runs the corresponding git commands directly.
+Intercepts prompts matching regex rules defined in `static-dispatch.toml`, runs the corresponding shell command, and suppresses Codex inference.
 
-Recognised prompt patterns are case-insensitive:
+Config is loaded from the first file found (project takes precedence):
+1. `{cwd}/static-dispatch.toml`
+2. `~/.codex/static-dispatch.toml`
 
-| Prompt | Behaviour |
-|---|---|
-| `Commit` | `git add -A` + `git commit` |
-| `Push` | `git push` |
-| `Commit and push` | commit then push |
-| `Commit, push` | commit then push |
-| `Commit, don't push` | commit only |
-| `Commit, no push` | commit only |
+Example config:
 
-Commit messages are generated from `git diff --staged --stat`, with `wip` as a fallback.
+```toml
+# matches: "commit and push", "commit, push"
+[[rule]]
+pattern = "^commit[,.]?\\s+(and\\s+)?push[.!]?$"
+command = "git add -A && git diff --staged --stat | tail -1 | xargs -I{} git commit -m '{}' && git push"
+
+# matches: "commit", "commit.", "commit!"
+[[rule]]
+pattern = "^commit[.!]?$"
+command = "git add -A && git diff --staged --stat | tail -1 | xargs -I{} git commit -m '{}'"
+
+# matches: "push", "push.", "push!"
+[[rule]]
+pattern = "^push[.!]?$"
+command = "git push"
+```
+
+Rules are matched top-to-bottom; first match wins. The matched prompt is available as `INTENT_PROMPT` env var in the command.
 
 ## File Structure
 
@@ -32,5 +58,7 @@ codex/
 │   └── plugin.json
 ├── hooks.json
 └── scripts/
-    └── git-intent.sh
+    ├── static-dispatch.py
+    ├── track-tokens.py
+    └── statusline.py
 ```

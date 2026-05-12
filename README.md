@@ -14,20 +14,20 @@ ai-plugins/
 │   ├── .claude-plugin/plugin.json
 │   └── hooks/
 │       ├── hooks.json
-│       ├── track-tokens.sh       # writes ~/.claude/token-usage/usage.jsonl
-│       ├── statusline.sh         # live token/cost statusline
-│       ├── git-intent.sh
-│       ├── pre-compact.sh
-│       ├── post-compact.sh
-│       ├── migrate-token-log.sh  # one-time .log → .jsonl migration
-│       └── backfill-projects.sh  # backfill project names from transcripts
+│       ├── track-tokens.py       # writes ~/.claude/token-usage/usage.jsonl
+│       ├── statusline.py         # live token/cost statusline
+│       ├── static-dispatch.py    # prompt dispatch via static-dispatch.toml rules
+│       ├── pre-compact.py
+│       ├── post-compact.py
+│       ├── migrate-token-log.py  # one-time .log → .jsonl migration
+│       └── backfill-projects.py  # backfill project names from transcripts
 ├── codex/
 │   ├── .codex-plugin/plugin.json
 │   ├── hooks.json
 │   └── scripts/
-│       ├── git-intent.sh
-│       ├── track-tokens.sh       # writes ~/.codex/token-usage/usage.jsonl
-│       └── statusline.sh         # session cost summary after each turn
+│       ├── static-dispatch.py    # prompt dispatch via static-dispatch.toml rules
+│       ├── track-tokens.py       # writes ~/.codex/token-usage/usage.jsonl
+│       └── statusline.py         # session cost summary after each turn
 └── token-usage-app/
     ├── README.md
     ├── build.sh                  # swiftc build script
@@ -52,6 +52,8 @@ Hooks fire on `Stop` and `UserPromptSubmit`. Each `Stop` reads the session trans
 ### Token Usage App
 
 Native macOS floating widget built with SwiftUI + Swift Charts. Reads from both `~/.claude/token-usage/usage.jsonl` and `~/.codex/token-usage/usage.jsonl` and renders cost over time as a bar chart with source filtering (All / Claude / Codex).
+
+![Token Usage App](token-usage-app/resources/all-usage.png)
 
 See [`token-usage-app/README.md`](token-usage-app/README.md) for details and build instructions.
 

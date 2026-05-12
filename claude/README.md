@@ -1,23 +1,21 @@
 # claude-assistant
 
-A Claude Code plugin providing token usage tracking, a live statusline, compaction analysis, and git shortcut commands.
+A Claude Code plugin providing token usage tracking, a live statusline, compaction analysis, and configurable prompt dispatch.
 
 ## Features
 
 ### 1. Token Usage Log
 
-**Script:** [`hooks/track-tokens.sh`](hooks/track-tokens.sh)
+**Script:** [`hooks/track-tokens.py`](hooks/track-tokens.py)
 **Hook:** `Stop`
 
-Appends a cost summary to `~/.claude/token-usage.log` at the end of every session.
+Appends an incremental JSONL entry to `~/.claude/token-usage/usage.jsonl` at the end of every turn.
 
-```text
-2026-05-04 17:37 | session=7e00a09e | in=37 out=4278 cache_write=31058 cache_read=293471 | ~$0.2687
+```json
+{"ts": "2026-05-07T10:00:00Z", "session_id": "uuid", "model": "claude-sonnet-4-6", "project": "ai-plugins", "tokens": {"input": 45, "output": 1823, "cache_write": 8420, "cache_read": 112074}, "cost_usd": 0.048312}
 ```
 
-Fields: date/time, session ID, input tokens, output tokens, cache write tokens, cache read tokens, estimated cost in USD.
-
-Cost rates used for `claude-sonnet-4-6`:
+Cost rates for `claude-sonnet-4-6`:
 
 | Token type | Rate per million |
 |---|---|
@@ -28,7 +26,7 @@ Cost rates used for `claude-sonnet-4-6`:
 
 ### 2. Live Statusline
 
-**Script:** [`hooks/statusline.sh`](hooks/statusline.sh)
+**Script:** [`hooks/statusline.py`](hooks/statusline.py)
 **Config:** `statusLine` in `~/.claude/settings.json`
 
 Displays a colour-coded statusline after each response showing real-time token and cost metrics.
@@ -37,43 +35,53 @@ Displays a colour-coded statusline after each response showing real-time token a
 [claude-sonnet-4-6] in:37(330529) out:4278 cache(r/w):293471/31058 ctx:0% cost:$0.2687
 ```
 
-The statusline must be wired manually in `~/.claude/settings.json`:
+Wire it manually in `~/.claude/settings.json`:
 
 ```json
 "statusLine": {
   "type": "command",
-  "command": "/path/to/claude/hooks/statusline.sh"
+  "command": "python3 /path/to/claude/hooks/statusline.py"
 }
 ```
 
 ### 3. Compaction Analysis
 
-**Scripts:** [`hooks/pre-compact.sh`](hooks/pre-compact.sh), [`hooks/post-compact.sh`](hooks/post-compact.sh)
+**Scripts:** [`hooks/pre-compact.py`](hooks/pre-compact.py), [`hooks/post-compact.py`](hooks/post-compact.py)
 **Hooks:** `PreCompact`, `PostCompact`
 
-Measures how many tokens were freed by a compaction and surfaces the result in the statusline.
+Snapshots context usage before compaction and computes the delta in the next `Stop` hook using `~/.claude/compaction/*.json` state files.
 
-The current implementation snapshots the latest context usage before compaction, then computes the delta in the next `Stop` hook using `~/.claude/compaction/*.json` state files.
+### 4. Prompt Dispatch
 
-### 4. Git Intent Shortcuts
-
-**Script:** [`hooks/git-intent.sh`](hooks/git-intent.sh)
+**Script:** [`hooks/static-dispatch.py`](hooks/static-dispatch.py)
 **Hook:** `UserPromptSubmit`
 
-Intercepts short commit/push prompts, runs the corresponding git commands directly, and suppresses Claude inference.
+Intercepts prompts matching regex rules defined in `static-dispatch.toml`, runs the corresponding shell command, and suppresses Claude inference.
 
-Recognised prompt patterns are case-insensitive:
+Config is loaded from the first file found (project takes precedence):
+1. `{cwd}/static-dispatch.toml`
+2. `~/.claude/static-dispatch.toml`
 
-| Prompt | Behaviour |
-|---|---|
-| `Commit` | `git add -A` + `git commit` |
-| `Push` | `git push` |
-| `Commit and push` | commit then push |
-| `Commit, push` | commit then push |
-| `Commit, don't push` | commit only |
-| `Commit, no push` | commit only |
+Example config:
 
-Commit messages are generated from `git diff --staged --stat`, with `wip` as a fallback.
+```toml
+# matches: "commit and push", "commit, push"
+[[rule]]
+pattern = "^commit[,.]?\\s+(and\\s+)?push[.!]?$"
+command = "git add -A && git diff --staged --stat | tail -1 | xargs -I{} git commit -m '{}' && git push"
+
+# matches: "commit", "commit.", "commit!"
+[[rule]]
+pattern = "^commit[.!]?$"
+command = "git add -A && git diff --staged --stat | tail -1 | xargs -I{} git commit -m '{}'"
+
+# matches: "push", "push.", "push!"
+[[rule]]
+pattern = "^push[.!]?$"
+command = "git push"
+```
+
+Rules are matched top-to-bottom; first match wins. The matched prompt is available as `INTENT_PROMPT` env var in the command.
 
 ## File Structure
 
@@ -84,9 +92,11 @@ claude/
 │   └── marketplace.json
 └── hooks/
     ├── hooks.json
-    ├── git-intent.sh
-    ├── post-compact.sh
-    ├── pre-compact.sh
-    ├── statusline.sh
-    └── track-tokens.sh
+    ├── static-dispatch.py
+    ├── track-tokens.py
+    ├── statusline.py
+    ├── pre-compact.py
+    ├── post-compact.py
+    ├── migrate-token-log.py
+    └── backfill-projects.py
 ```
