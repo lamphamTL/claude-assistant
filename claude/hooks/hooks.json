@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/git-intent.py\""
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/static-dispatch.py\""
           }
         ]
       }

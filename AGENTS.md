@@ -12,7 +12,7 @@ ai-plugins/
 │       ├── hooks.json            # Hook wiring (Stop, UserPromptSubmit, PreCompact, PostCompact)
 │       ├── track-tokens.py       # Appends incremental JSONL entry to ~/.claude/token-usage/usage.jsonl
 │       ├── statusline.py         # Live token/cost statusline for Claude Code
-│       ├── git-intent.py         # Shorthand commit/push from UserPromptSubmit
+│       ├── static-dispatch.py    # Dispatch UserPromptSubmit prompts via static-scripts.toml rules
 │       ├── pre-compact.py        # Snapshot context before compaction
 │       ├── post-compact.py       # Post-compaction placeholder
 │       ├── migrate-token-log.py  # One-time migration from old .log → .jsonl format
@@ -21,7 +21,7 @@ ai-plugins/
 │   ├── .codex-plugin/plugin.json
 │   ├── hooks.json                # Hook wiring (Stop, UserPromptSubmit)
 │   └── scripts/
-│       ├── git-intent.py         # Shorthand commit/push from UserPromptSubmit
+│       ├── static-dispatch.py    # Dispatch UserPromptSubmit prompts via static-scripts.toml rules
 │       ├── track-tokens.py       # Appends incremental JSONL entry to ~/.codex/token-usage/usage.jsonl
 │       └── statusline.py         # Session token/cost summary printed after each turn
 └── token-usage-app/          # Native macOS SwiftUI widget

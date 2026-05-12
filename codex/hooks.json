@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ./scripts/git-intent.py",
+            "command": "python3 ./scripts/static-dispatch.py",
             "statusMessage": "Checking git intent"
           }
         ]
