@@ -130,9 +130,7 @@ claude plugins install claude-assistant@ai-plugins
 
 **Codex:**
 ```bash
-git -C ~/.codex/plugins/marketplaces/ai-plugins pull
-codex plugins uninstall codex-assistant@ai-plugins
-codex plugins install codex-assistant@ai-plugins
+codex plugin marketplace upgrade ai-plugins
 ```
 
 ## One-time utilities
