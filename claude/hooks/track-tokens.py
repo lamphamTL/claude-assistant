@@ -130,3 +130,12 @@ entry = {
 
 with open(usage_dir / "usage.jsonl", "a", encoding="utf-8") as f:
     f.write(json.dumps(entry) + "\n")
+
+(usage_dir / "last-turn.json").write_text(json.dumps({
+    "session_id": session_id,
+    "input":       delta_input,
+    "output":      delta_output,
+    "cache_write": delta_cache_write,
+    "cache_read":  delta_cache_read,
+    "cost_usd":    cost,
+}))

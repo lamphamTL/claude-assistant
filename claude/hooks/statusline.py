@@ -5,16 +5,30 @@ from pathlib import Path
 
 data = json.loads(sys.stdin.read())
 
-model    = (data.get("model") or {}).get("display_name") or "?"
-cw       = (data.get("context_window") or {}).get("current_usage") or {}
-in_tok   = cw.get("input_tokens", 0)
-out_tok  = cw.get("output_tokens", 0)
-cache_r  = cw.get("cache_read_input_tokens", 0)
-cache_w  = cw.get("cache_creation_input_tokens", 0)
-ctx_pct  = int((data.get("context_window") or {}).get("used_percentage") or 0)
-cost     = float((data.get("cost") or {}).get("total_cost_usd") or 0)
+model_raw = data.get("model") or {}
+model     = model_raw if isinstance(model_raw, str) else (model_raw.get("display_name") or "?")
+
+cw      = (data.get("context_window") or {}).get("current_usage") or {}
+in_tok  = cw.get("input_tokens", 0)
+out_tok = cw.get("output_tokens", 0)
+cache_r = cw.get("cache_read_input_tokens", 0)
+cache_w = cw.get("cache_creation_input_tokens", 0)
+ctx_pct = int((data.get("context_window") or {}).get("used_percentage") or 0)
 
 total_in = in_tok + cache_r + cache_w
+
+session_id = data.get("session_id") or ""
+
+# Per-turn cost from track-tokens.py
+cost = 0.0
+last_turn_file = Path.home() / ".claude/token-usage/last-turn.json"
+if last_turn_file.exists():
+    try:
+        lt = json.loads(last_turn_file.read_text())
+        if lt.get("session_id") == session_id:
+            cost = lt.get("cost_usd", 0.0)
+    except Exception:
+        pass
 
 RESET   = "\033[0m"
 BOLD    = "\033[1m"
@@ -29,7 +43,6 @@ BLUE    = "\033[34m"
 ctx_color  = RED if ctx_pct >= 80 else (YELLOW if ctx_pct >= 50 else GREEN)
 cost_color = RED if cost >= 0.50  else (YELLOW if cost >= 0.10  else GREEN)
 
-session_id   = data.get("session_id") or ""
 compact_info = ""
 compact_file = Path.home() / ".claude/compaction/result.json"
 if compact_file.exists():
