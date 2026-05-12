@@ -10,20 +10,20 @@ ai-plugins/
 │   ├── .claude-plugin/plugin.json
 │   └── hooks/
 │       ├── hooks.json            # Hook wiring (Stop, UserPromptSubmit, PreCompact, PostCompact)
-│       ├── track-tokens.sh       # Appends incremental JSONL entry to ~/.claude/token-usage/usage.jsonl
-│       ├── statusline.sh         # Live token/cost statusline for Claude Code
-│       ├── git-intent.sh         # Shorthand commit/push from UserPromptSubmit
-│       ├── pre-compact.sh        # Snapshot context before compaction
-│       ├── post-compact.sh       # Post-compaction placeholder
-│       ├── migrate-token-log.sh  # One-time migration from old .log → .jsonl format (Python)
-│       └── backfill-projects.sh  # Backfill project names from session transcripts (Python)
+│       ├── track-tokens.py       # Appends incremental JSONL entry to ~/.claude/token-usage/usage.jsonl
+│       ├── statusline.py         # Live token/cost statusline for Claude Code
+│       ├── git-intent.py         # Shorthand commit/push from UserPromptSubmit
+│       ├── pre-compact.py        # Snapshot context before compaction
+│       ├── post-compact.py       # Post-compaction placeholder
+│       ├── migrate-token-log.py  # One-time migration from old .log → .jsonl format
+│       └── backfill-projects.py  # Backfill project names from session transcripts
 ├── codex/                    # Codex CLI plugin
 │   ├── .codex-plugin/plugin.json
 │   ├── hooks.json                # Hook wiring (Stop, UserPromptSubmit)
 │   └── scripts/
-│       ├── git-intent.sh         # Shorthand commit/push from UserPromptSubmit
-│       ├── track-tokens.sh       # Appends incremental JSONL entry to ~/.codex/token-usage/usage.jsonl
-│       └── statusline.sh         # Session token/cost summary printed after each turn
+│       ├── git-intent.py         # Shorthand commit/push from UserPromptSubmit
+│       ├── track-tokens.py       # Appends incremental JSONL entry to ~/.codex/token-usage/usage.jsonl
+│       └── statusline.py         # Session token/cost summary printed after each turn
 └── token-usage-app/          # Native macOS SwiftUI widget
     ├── build.sh              # Build script (uses swiftc directly — SPM broken on macOS 26 beta)
     ├── resources/            # Screenshots and assets
@@ -40,7 +40,7 @@ ai-plugins/
 
 ### Claude
 
-Written by `claude/hooks/track-tokens.sh` on every `Stop` event.
+Written by `claude/hooks/track-tokens.py` on every `Stop` event.
 
 **Location:** `~/.claude/token-usage/usage.jsonl`
 **State file:** `~/.claude/token-usage/state.json` (per-session cumulative totals for delta computation)
@@ -62,7 +62,7 @@ Written by `claude/hooks/track-tokens.sh` on every `Stop` event.
 
 ### Codex
 
-Written by `codex/scripts/track-tokens.sh` on every `Stop` event.
+Written by `codex/scripts/track-tokens.py` on every `Stop` event.
 
 **Location:** `~/.codex/token-usage/usage.jsonl`
 **State file:** `~/.codex/token-usage/state.json` (per-session cumulative totals for delta computation)
@@ -80,7 +80,7 @@ Written by `codex/scripts/track-tokens.sh` on every `Stop` event.
 
 - Token data comes from `token_count` events in the session transcript JSONL (`~/.codex/sessions/`).
 - Reasoning tokens billed at output rate.
-- Cost rates per model (USD/million): see `codex/scripts/track-tokens.sh`.
+- Cost rates per model (USD/million): see `codex/scripts/track-tokens.py`.
 
 ## Token usage widget
 
@@ -139,5 +139,5 @@ codex plugins install codex-assistant@ai-plugins
 
 | Script | Purpose |
 |--------|---------|
-| `claude/hooks/migrate-token-log.sh` | Convert old `token-usage.log` (pipe-delimited) to `usage.jsonl` |
-| `claude/hooks/backfill-projects.sh` | Patch `project: "unknown"` entries using session transcript `cwd` |
+| `claude/hooks/migrate-token-log.py` | Convert old `token-usage.log` (pipe-delimited) to `usage.jsonl` |
+| `claude/hooks/backfill-projects.py` | Patch `project: "unknown"` entries using session transcript `cwd` |

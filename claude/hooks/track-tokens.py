@@ -1,0 +1,131 @@
+#!/usr/bin/env python3
+import json
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+data = json.loads(sys.stdin.read())
+
+session_id = data.get("session_id") or "unknown"
+transcript  = data.get("transcript_path") or ""
+model       = (data.get("model") or {}).get("display_name") or "unknown"
+
+cwd = data.get("cwd") or ""
+if not cwd:
+    cwd = str(Path.cwd())
+if "/.claude/worktrees/" in cwd:
+    cwd = cwd[:cwd.index("/.claude/worktrees/")]
+project = Path(cwd).name or "unknown"
+
+# ── Compaction tracking ───────────────────────────────────────────────────────
+cw_usage    = (data.get("context_window") or {}).get("current_usage") or {}
+in_tok      = cw_usage.get("input_tokens", 0)
+cache_r     = cw_usage.get("cache_read_input_tokens", 0)
+cache_w     = cw_usage.get("cache_creation_input_tokens", 0)
+ctx_tokens  = in_tok + cache_r + cache_w
+
+compaction_dir = Path.home() / ".claude/compaction"
+compaction_dir.mkdir(parents=True, exist_ok=True)
+
+(compaction_dir / "last-stop.json").write_text(
+    json.dumps({"session_id": session_id, "context_tokens": ctx_tokens})
+)
+
+pre_file = compaction_dir / "pre.json"
+if pre_file.exists():
+    try:
+        pre = json.loads(pre_file.read_text())
+        if pre.get("session_id") == session_id:
+            tokens_before = pre.get("tokens_before", 0)
+            reduced = tokens_before - ctx_tokens
+            (compaction_dir / "result.json").write_text(json.dumps({
+                "session_id":    session_id,
+                "tokens_before": tokens_before,
+                "tokens_after":  ctx_tokens,
+                "reduced":       reduced,
+            }))
+            pre_file.unlink()
+    except Exception:
+        pass
+
+if not transcript or not Path(transcript).exists():
+    sys.exit(0)
+
+# ── Accumulate cumulative session totals from transcript ──────────────────────
+total_input = total_output = total_cache_write = total_cache_read = 0
+
+with open(transcript, encoding="utf-8") as f:
+    for line in f:
+        try:
+            d = json.loads(line)
+            usage = (d.get("message") or {}).get("usage")
+            if not usage:
+                continue
+            total_input       += usage.get("input_tokens", 0)
+            total_output      += usage.get("output_tokens", 0)
+            total_cache_write += usage.get("cache_creation_input_tokens", 0)
+            total_cache_read  += usage.get("cache_read_input_tokens", 0)
+        except Exception:
+            pass
+
+# ── Compute incremental delta since last Stop ─────────────────────────────────
+usage_dir  = Path.home() / ".claude/token-usage"
+usage_dir.mkdir(parents=True, exist_ok=True)
+state_file = usage_dir / "state.json"
+
+prev_input = prev_output = prev_cache_write = prev_cache_read = 0
+state = {}
+
+if state_file.exists():
+    try:
+        state = json.loads(state_file.read_text())
+        prev  = state.get(session_id) or {}
+        prev_input       = prev.get("input", 0)
+        prev_output      = prev.get("output", 0)
+        prev_cache_write = prev.get("cache_write", 0)
+        prev_cache_read  = prev.get("cache_read", 0)
+    except Exception:
+        pass
+
+delta_input       = total_input       - prev_input
+delta_output      = total_output      - prev_output
+delta_cache_write = total_cache_write - prev_cache_write
+delta_cache_read  = total_cache_read  - prev_cache_read
+
+if delta_input == 0 and delta_output == 0:
+    sys.exit(0)
+
+# ── Persist updated cumulative totals ─────────────────────────────────────────
+state[session_id] = {
+    "input":       total_input,
+    "output":      total_output,
+    "cache_write": total_cache_write,
+    "cache_read":  total_cache_read,
+}
+state_file.write_text(json.dumps(state))
+
+# ── Cost (USD/million: input $3, output $15, cache_write $3.75, cache_read $0.30)
+cost = round(
+    (delta_input * 3 + delta_output * 15 + delta_cache_write * 3.75 + delta_cache_read * 0.30)
+    / 1_000_000,
+    6,
+)
+
+# ── Append JSONL entry ────────────────────────────────────────────────────────
+ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+entry = {
+    "ts":         ts,
+    "session_id": session_id,
+    "model":      model,
+    "project":    project,
+    "tokens": {
+        "input":       delta_input,
+        "output":      delta_output,
+        "cache_write": delta_cache_write,
+        "cache_read":  delta_cache_read,
+    },
+    "cost_usd": cost,
+}
+
+with open(usage_dir / "usage.jsonl", "a", encoding="utf-8") as f:
+    f.write(json.dumps(entry) + "\n")

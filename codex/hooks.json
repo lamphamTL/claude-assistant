@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ./scripts/git-intent.sh",
+            "command": "python3 ./scripts/git-intent.py",
             "statusMessage": "Checking git intent"
           }
         ]
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ./scripts/track-tokens.sh",
+            "command": "python3 ./scripts/track-tokens.py",
             "statusMessage": "Tracking tokens"
           }
         ]
@@ -25,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ./scripts/statusline.sh",
+            "command": "python3 ./scripts/statusline.py",
             "statusMessage": "Showing usage"
           }
         ]

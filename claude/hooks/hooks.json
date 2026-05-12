@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/git-intent.sh\""
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/git-intent.py\""
           }
         ]
       }
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-compact.sh\""
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-compact.py\""
           }
         ]
       }
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/post-compact.sh\""
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/post-compact.py\""
           }
         ]
       }
@@ -39,7 +39,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/track-tokens.sh\""
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/track-tokens.py\""
           }
         ]
       }
