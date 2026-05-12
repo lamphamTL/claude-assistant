@@ -2,8 +2,8 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var store: UsageStore
-    @State private var selectedKind: TimeRangeKind = .week
-    @State private var scrollDate: Date = Self.initialScrollDate(for: .week)
+    @State private var selectedKind: TimeRangeKind = .day
+    @State private var scrollDate: Date = Self.initialScrollDate(for: .day)
     @State private var selectedProject: String? = nil
     @State private var selectedSource: String? = nil
     @State private var isHovering = false

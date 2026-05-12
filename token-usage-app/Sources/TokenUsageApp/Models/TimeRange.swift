@@ -87,7 +87,7 @@ struct TimeWindow {
     static func initialScrollDate(for kind: TimeRangeKind, relativeTo now: Date = Date()) -> Date {
         var cal = Calendar.current
         if kind == .week { cal.firstWeekday = 2 }
-        let bucketBack = cal.date(byAdding: kind.bucketComponent, value: -kind.barCount, to: now)!
+        let bucketBack = cal.date(byAdding: kind.bucketComponent, value: -(kind.barCount - 1), to: now)!
         return cal.dateInterval(of: kind.bucketComponent, for: bucketBack)!.start
     }
 }
