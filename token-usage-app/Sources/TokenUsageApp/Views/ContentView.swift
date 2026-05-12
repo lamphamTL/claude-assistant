@@ -88,7 +88,7 @@ struct ContentView: View {
 
                     // Close
                     Button {
-                        NSApp.terminate(nil)
+                        NotificationCenter.default.post(name: .init("com.lampham.tokenusage.close"), object: nil)
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 13))

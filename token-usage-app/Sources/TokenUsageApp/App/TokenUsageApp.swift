@@ -4,74 +4,70 @@ import ServiceManagement
 import Combine
 
 class AppDelegate: NSObject, NSApplicationDelegate {
-    var panel: NSPanel?
-    var hosting: NSHostingView<AnyView>?
+    var statusItem: NSStatusItem!
+    var popover: NSPopover!
     let store = UsageStore()
     private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
         store.load()
 
-        let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 320, height: 200),
-            styleMask: [.nonactivatingPanel, .fullSizeContentView, .borderless],
-            backing: .buffered,
-            defer: false
-        )
-        panel.level = .floating
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.isMovableByWindowBackground = true
-        panel.backgroundColor = .clear
-        panel.isOpaque = false
-        panel.hasShadow = false
-        panel.acceptsMouseMovedEvents = true
-
-        let hosting = NSHostingView(rootView: AnyView(
-            ContentView()
-                .environmentObject(store)
-        ))
-        // Width-only autoresize — height driven by fittingSize
-        hosting.autoresizingMask = [.width]
-        panel.contentView = hosting
-        self.hosting = hosting
-        self.panel = panel
-
-        positionPanel()
-        panel.orderFrontRegardless()
-
-        // Resize panel to content once data is loaded, then on every isLoaded toggle
-        store.$isLoaded
-            .filter { $0 }
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                // Allow one layout pass before measuring
-                DispatchQueue.main.async { self?.fitPanelToContent() }
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        if let button = statusItem.button {
+            let orange = NSColor(red: 1.0, green: 0.55, blue: 0.0, alpha: 1.0)
+            let config = NSImage.SymbolConfiguration(paletteColors: [orange])
+            if let img = NSImage(systemSymbolName: "flame.fill", accessibilityDescription: "Token Usage")?
+                .withSymbolConfiguration(config) {
+                img.isTemplate = false
+                button.image = img
             }
+            button.action = #selector(togglePopover)
+            button.target = self
+        }
+
+        let hostingController = NSHostingController(rootView:
+            ContentView().environmentObject(store)
+        )
+        popover = NSPopover()
+        popover.contentViewController = hostingController
+        popover.behavior = .transient
+
+        NotificationCenter.default.addObserver(
+            forName: .init("com.lampham.tokenusage.close"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.popover.performClose(nil)
+        }
+
+        store.$entries
+            .receive(on: RunLoop.main)
+            .sink { [weak self] entries in self?.updateStatusTitle(entries: entries) }
             .store(in: &cancellables)
 
         try? SMAppService.mainApp.register()
     }
 
-    private func fitPanelToContent() {
-        guard let hosting, let panel else { return }
-        hosting.layout()
-        let h = hosting.fittingSize.height
-        guard h > 50 else { return }
-        // Keep bottom-right anchor fixed while resizing height
-        let origin = NSPoint(
-            x: panel.frame.origin.x,
-            y: panel.frame.origin.y + panel.frame.height - h
-        )
-        panel.setContentSize(CGSize(width: 320, height: h))
-        panel.setFrameOrigin(origin)
+    private func updateStatusTitle(entries: [UsageEntry]) {
+        let today = Calendar.current.startOfDay(for: Date())
+        let cost = entries.filter { $0.ts >= today }.reduce(0.0) { $0 + $1.cost_usd }
+        let text = String(format: " $%.2f", cost)
+        let attrs: [NSAttributedString.Key: Any] = [
+            .foregroundColor: NSColor(red: 1.0, green: 0.55, blue: 0.0, alpha: 1.0),
+            .font: NSFont.systemFont(ofSize: NSFont.systemFontSize(for: .small))
+        ]
+        statusItem.button?.attributedTitle = NSAttributedString(string: text, attributes: attrs)
     }
 
-    private func positionPanel() {
-        guard let panel, let screen = NSScreen.main else { return }
-        let margin: CGFloat = 24
-        let x = screen.visibleFrame.maxX - 320 - margin
-        let y = screen.visibleFrame.minY + margin
-        panel.setFrameOrigin(NSPoint(x: x, y: y))
+    @objc func togglePopover(_ sender: AnyObject?) {
+        guard let button = statusItem.button else { return }
+        if popover.isShown {
+            popover.performClose(sender)
+        } else {
+            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            NSApp.activate(ignoringOtherApps: true)
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
