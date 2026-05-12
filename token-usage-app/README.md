@@ -10,6 +10,16 @@ A native macOS floating widget that visualises Claude Code and Codex token costs
 
 Visualise AI spending (USD) across Claude and Codex sessions. Filter by tool (Claude / Codex), project, and timeframe (day / week / month).
 
+### Spend efficiency chart ($/event)
+
+1 event = 1 prompt submitted and responded to.
+
+Toggle **`$/ev`** in the header to switch to the efficiency chart. Each point shows average cost per event (`total_cost_usd / stop_events`) for that bucket.
+
+**Goal: minimise $/event without sacrificing output quality.** A downward trend means workflow changes — tighter prompts, response-compression skills, leaner context — are paying off.
+
+![Spend per event chart](resources/spend-per-event.png)
+
 ## Requirements
 
 - macOS 14 or later (runs on macOS 26 Tahoe beta)

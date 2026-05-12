@@ -6,6 +6,7 @@ struct ContentView: View {
     @State private var scrollDate: Date = Self.initialScrollDate(for: .day)
     @State private var selectedProject: String? = nil
     @State private var selectedSource: String? = nil
+    @State private var showEfficiency: Bool = false
     @State private var isHovering = false
 
     private let sources = [("All", String?.none), ("Claude", "claude"), ("Codex", "codex")]
@@ -64,6 +65,26 @@ struct ContentView: View {
                     }
                     .padding(3)
                     .background(.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+
+                    // Efficiency toggle
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showEfficiency.toggle()
+                        }
+                    } label: {
+                        Text("$/ev")
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(
+                                showEfficiency
+                                    ? Color.green.opacity(0.25)
+                                    : Color.primary.opacity(0.05),
+                                in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            )
+                            .foregroundStyle(showEfficiency ? Color.green : .secondary)
+                    }
+                    .buttonStyle(.plain)
 
                     // Close
                     Button {
@@ -178,7 +199,8 @@ struct ContentView: View {
                         kind: selectedKind,
                         scrollDate: scrollDate,
                         scrollDateBinding: $scrollDate,
-                        showCredits: selectedSource == "codex"
+                        showCredits: selectedSource == "codex",
+                        showEfficiency: showEfficiency
                     )
                     .padding(.horizontal, 14)
                     .padding(.bottom, 8)
