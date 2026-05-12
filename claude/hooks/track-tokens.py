@@ -8,7 +8,8 @@ data = json.loads(sys.stdin.read())
 
 session_id = data.get("session_id") or "unknown"
 transcript  = data.get("transcript_path") or ""
-model       = (data.get("model") or {}).get("display_name") or "unknown"
+model_raw   = data.get("model") or {}
+model       = model_raw if isinstance(model_raw, str) else (model_raw.get("display_name") or "unknown")
 
 cwd = data.get("cwd") or ""
 if not cwd:
