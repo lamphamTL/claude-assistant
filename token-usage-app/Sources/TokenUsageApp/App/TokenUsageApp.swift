@@ -25,6 +25,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             button.action = #selector(togglePopover)
             button.target = self
         }
+        statusItem.isVisible = true
 
         let hostingController = NSHostingController(rootView:
             ContentView().environmentObject(store)
