@@ -11,6 +11,7 @@
     "hooks",
     "productivity"
   ],
+  "hooks": "./hooks.json",
   "interface": {
     "displayName": "Codex Assistant",
     "shortDescription": "Token tracking, cost statusline, and git shortcuts for Codex",

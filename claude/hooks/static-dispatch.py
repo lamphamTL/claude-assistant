@@ -18,13 +18,17 @@ def load_config(cwd, app_home):
     return rules
 
 
+def applescript_quote(s):
+    return '"' + s.replace('\\', '\\\\').replace('"', '\\"') + '"'
+
+
 def dispatch(prompt, rules, cwd):
     for rule in rules:
         if re.search(rule["pattern"], prompt, re.IGNORECASE):
             script = f"cd {shlex.quote(cwd)} && {rule['command']}"
             subprocess.Popen(
                 ["osascript", "-e",
-                 f'tell application "Terminal" to do script {shlex.quote(script)}'],
+                 f'tell application "Terminal" to do script {applescript_quote(script)}'],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             )
             return f"Running in Terminal: {rule['command']}"
