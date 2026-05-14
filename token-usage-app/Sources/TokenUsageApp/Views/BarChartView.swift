@@ -1,6 +1,30 @@
 import SwiftUI
 import Charts
 
+enum ChartMode: String, CaseIterable, Identifiable {
+    case cost
+    case efficiency
+    case eventCount
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .cost:       return "Spend"
+        case .efficiency: return "Cost per event"
+        case .eventCount: return "Event count"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .cost:       return "dollarsign"
+        case .efficiency: return "chart.line.uptrend.xyaxis"
+        case .eventCount: return "number"
+        }
+    }
+}
+
 struct ChartPoint: Identifiable {
     var id: String { "\(bucketDate.timeIntervalSinceReferenceDate)-\(project)-\(source)" }
     let bucketDate: Date
@@ -8,6 +32,7 @@ struct ChartPoint: Identifiable {
     let source: String
     let cost: Double
     let totalTokens: Int
+    let eventCount: Int
 }
 
 // Pre-computed chart data passed from ContentView — no raw entries inside BarChartView
@@ -31,7 +56,7 @@ struct BarChartView: View {
     @Binding var scrollDateBinding: Date
     let projectColors: [String: Int]
     var showCredits: Bool = false
-    var showEfficiency: Bool = false
+    var chartMode: ChartMode = .cost
 
     @Environment(\.displayMode) private var displayMode
 
@@ -85,16 +110,30 @@ struct BarChartView: View {
         return bucketCosts.compactMap { date, cost in
             guard let count = data.bucketCounts[date], count > 0 else { return nil }
             return ChartPoint(bucketDate: date, project: "avg", source: "",
-                              cost: cost / Double(count), totalTokens: 0)
+                              cost: cost / Double(count), totalTokens: 0, eventCount: count)
         }.sorted { $0.bucketDate < $1.bucketDate }
     }
 
-    private var activePoints: [ChartPoint] { showEfficiency ? efficiencyPoints : data.points }
+    private var activePoints: [ChartPoint] {
+        chartMode == .efficiency ? efficiencyPoints : data.points
+    }
 
-    private var selectedBucketValue: Double? {
+    // Selected-bucket aggregate, semantics depend on mode.
+    private var selectedBucketCost: Double? {
         guard let bucket = selectedBucket else { return nil }
-        let matching = activePoints.filter { $0.bucketDate == bucket }
+        let matching = data.points.filter { $0.bucketDate == bucket }
         return matching.isEmpty ? nil : matching.reduce(0) { $0 + $1.cost }
+    }
+
+    private var selectedBucketEfficiency: Double? {
+        guard let bucket = selectedBucket else { return nil }
+        let matching = efficiencyPoints.first(where: { $0.bucketDate == bucket })
+        return matching?.cost
+    }
+
+    private var selectedBucketEventCount: Int? {
+        guard let bucket = selectedBucket else { return nil }
+        return data.bucketCounts[bucket]
     }
 
     private var overallEfficiency: Double {
@@ -157,126 +196,46 @@ struct BarChartView: View {
         guard let interval = cal.dateInterval(of: kind.bucketComponent, for: clickedDate) else { return nil }
         let bucketStart = interval.start
 
-        if showEfficiency {
+        switch chartMode {
+        case .efficiency:
             // Line chart: accept tap anywhere in the bucket column
             return activePoints.contains { $0.bucketDate == bucketStart } ? bucketStart : nil
-        } else {
+        case .cost:
             let bucketTotal = activePoints.filter { $0.bucketDate == bucketStart }.reduce(0.0) { $0 + $1.cost }
             guard bucketTotal > 0, clickedValue <= bucketTotal else { return nil }
+            return bucketStart
+        case .eventCount:
+            let bucketTotal = data.bucketCounts[bucketStart] ?? 0
+            guard bucketTotal > 0, clickedValue <= Double(bucketTotal) else { return nil }
             return bucketStart
         }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            if showEfficiency {
-                Chart(efficiencyPoints) { point in
-                    LineMark(
-                        x: .value("Time", point.bucketDate, unit: kind.bucketComponent),
-                        y: .value("$/event", point.cost)
-                    )
-                    .foregroundStyle(Color.green.opacity(0.85))
-                    .interpolationMethod(.catmullRom)
-
-                    PointMark(
-                        x: .value("Time", point.bucketDate, unit: kind.bucketComponent),
-                        y: .value("$/event", point.cost)
-                    )
-                    .foregroundStyle(selectedBucket == nil || selectedBucket == point.bucketDate
-                        ? Color.green
-                        : Color.green.opacity(0.3))
-                    .symbolSize(selectedBucket == point.bucketDate ? 60 : 30)
-                }
-                .chartXAxis { efficiencyXAxis }
-                .chartYAxis { efficiencyYAxis }
-                .chartXScale(domain: scrollDate.addingTimeInterval(-barDuration / 2) ... visibleEnd.addingTimeInterval(barDuration / 2))
-                .chartLegend(.hidden)
-                .frame(minHeight: chartMinHeight, maxHeight: chartMaxHeight)
-                .animation(nil, value: kind)
-                .animation(nil, value: scrollDate)
-                .animation(nil, value: barCount)
-                .chartOverlay { proxy in
-                    GeometryReader { geo in
-                        Rectangle().fill(.clear).contentShape(Rectangle())
-                            .onTapGesture { location in
-                                if let bucket = hitBucket(at: location, proxy: proxy, geo: geo) {
-                                    selectedBucket = (selectedBucket == bucket) ? nil : bucket
-                                } else {
-                                    selectedBucket = nil
-                                }
-                            }
-                    }
-                }
-                .onChange(of: scrollDate)     { _, _ in selectedBucket = nil }
-                .onChange(of: kind)           { _, _ in selectedBucket = nil }
-                .onChange(of: showEfficiency) { _, _ in selectedBucket = nil }
-            } else {
-                Chart(data.points) { point in
-                    BarMark(
-                        x: .value("Time", point.bucketDate, unit: kind.bucketComponent),
-                        y: .value("Cost", point.cost)
-                    )
-                    .foregroundStyle(by: .value("Project", point.project))
-                    .cornerRadius(3)
-                    .opacity(selectedBucket == nil || selectedBucket == point.bucketDate ? 1.0 : 0.3)
-                }
-                .chartForegroundStyleScale(
-                    domain: allProjects,
-                    range: allProjects.map { colorFor($0) }
-                )
-                .chartXAxis { costXAxis }
-                .chartYAxis { costYAxis }
-                .chartXScale(domain: scrollDate.addingTimeInterval(-barDuration / 2) ... visibleEnd.addingTimeInterval(barDuration / 2))
-                .chartLegend(.hidden)
-                .frame(minHeight: chartMinHeight, maxHeight: chartMaxHeight)
-                .animation(nil, value: kind)
-                .animation(nil, value: scrollDate)
-                .animation(nil, value: barCount)
-                .chartOverlay { proxy in
-                    GeometryReader { geo in
-                        Rectangle().fill(.clear).contentShape(Rectangle())
-                            .onTapGesture { location in
-                                if let bucket = hitBucket(at: location, proxy: proxy, geo: geo) {
-                                    selectedBucket = (selectedBucket == bucket) ? nil : bucket
-                                } else {
-                                    selectedBucket = nil
-                                }
-                            }
-                    }
-                }
-                .onChange(of: scrollDate)     { _, _ in selectedBucket = nil }
-                .onChange(of: kind)           { _, _ in selectedBucket = nil }
-                .onChange(of: showEfficiency) { _, _ in selectedBucket = nil }
+            switch chartMode {
+            case .efficiency:
+                efficiencyChart
+            case .cost:
+                costChart
+            case .eventCount:
+                eventCountChart
             }
 
             // ── Footer ─────────────────────────────────────────────────
             ZStack(alignment: .center) {
                 HStack(alignment: .firstTextBaseline, spacing: 0) {
-                    if showEfficiency {
-                        let displayAvg = selectedBucketValue ?? overallEfficiency
-                        Text(String(format: "$%.4f/event", displayAvg))
-                            .font(.system(size: 15, weight: .semibold, design: .rounded))
-                            .foregroundStyle(Color.green)
-                            .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .leading)))
-                    } else {
-                        let displayCost = selectedBucketValue ?? data.totalCost
-                        Text(String(format: "$%.4f", displayCost))
-                            .font(.system(size: 15, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.primary)
-                            .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .leading)))
-                    }
-
+                    primaryFooterMetric
                     Spacer()
-
-                    if !showEfficiency {
-                        let count = selectedBucket.flatMap { data.bucketCounts[$0] } ?? data.totalEntries
+                    if chartMode != .efficiency {
+                        let count = selectedBucketEventCount ?? data.totalEntries
                         Text("\(count) event\(count == 1 ? "" : "s")")
                             .font(.system(size: 10, weight: .medium, design: .rounded))
                             .foregroundStyle(.white.opacity(0.75))
                     }
                 }
 
-                if showCredits && !showEfficiency {
+                if showCredits && chartMode == .cost {
                     let displayCredits = selectedBucket.flatMap { data.bucketCredits[$0] } ?? data.totalCredits
                     Text(String(format: "%.2f cr", displayCredits))
                         .font(.system(size: 10, weight: .medium, design: .rounded))
@@ -288,29 +247,134 @@ struct BarChartView: View {
         }
     }
 
-    @AxisContentBuilder
-    private var costXAxis: some AxisContent {
-        AxisMarks(values: .stride(by: kind.bucketComponent)) { value in
-            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                .foregroundStyle(.primary.opacity(0.18))
-            AxisValueLabel {
-                if let date = value.as(Date.self) {
-                    if kind == .day {
-                        dayLabel(for: date)
-                    } else if kind == .week {
-                        weekLabel(for: date)
+    @ViewBuilder
+    private var primaryFooterMetric: some View {
+        switch chartMode {
+        case .cost:
+            let displayCost = selectedBucketCost ?? data.totalCost
+            Text(String(format: "$%.4f", displayCost))
+                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .foregroundStyle(.primary)
+        case .efficiency:
+            let displayAvg = selectedBucketEfficiency ?? overallEfficiency
+            Text(String(format: "$%.4f/event", displayAvg))
+                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.green)
+        case .eventCount:
+            let count = selectedBucketEventCount ?? data.totalEntries
+            Text("\(count)")
+                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .foregroundStyle(.primary)
+        }
+    }
+
+    // MARK: - Chart variants
+
+    private var commonXScale: ClosedRange<Date> {
+        scrollDate.addingTimeInterval(-barDuration / 2) ... visibleEnd.addingTimeInterval(barDuration / 2)
+    }
+
+    @ViewBuilder
+    private var costChart: some View {
+        Chart(data.points) { point in
+            BarMark(
+                x: .value("Time", point.bucketDate, unit: kind.bucketComponent),
+                y: .value("Cost", point.cost)
+            )
+            .foregroundStyle(by: .value("Project", point.project))
+            .cornerRadius(3)
+            .opacity(selectedBucket == nil || selectedBucket == point.bucketDate ? 1.0 : 0.3)
+        }
+        .chartForegroundStyleScale(domain: allProjects, range: allProjects.map { colorFor($0) })
+        .chartXAxis { categoricalXAxis }
+        .chartYAxis { costYAxis }
+        .chartXScale(domain: commonXScale)
+        .chartLegend(.hidden)
+        .frame(minHeight: chartMinHeight, maxHeight: chartMaxHeight)
+        .animation(nil, value: kind)
+        .animation(nil, value: scrollDate)
+        .animation(nil, value: barCount)
+        .chartOverlay { proxy in tapOverlay(proxy: proxy) }
+        .onChange(of: scrollDate) { _, _ in selectedBucket = nil }
+        .onChange(of: kind)       { _, _ in selectedBucket = nil }
+        .onChange(of: chartMode)  { _, _ in selectedBucket = nil }
+    }
+
+    @ViewBuilder
+    private var eventCountChart: some View {
+        Chart(data.points) { point in
+            BarMark(
+                x: .value("Time", point.bucketDate, unit: kind.bucketComponent),
+                y: .value("Events", point.eventCount)
+            )
+            .foregroundStyle(by: .value("Project", point.project))
+            .cornerRadius(3)
+            .opacity(selectedBucket == nil || selectedBucket == point.bucketDate ? 1.0 : 0.3)
+        }
+        .chartForegroundStyleScale(domain: allProjects, range: allProjects.map { colorFor($0) })
+        .chartXAxis { categoricalXAxis }
+        .chartYAxis { eventCountYAxis }
+        .chartXScale(domain: commonXScale)
+        .chartLegend(.hidden)
+        .frame(minHeight: chartMinHeight, maxHeight: chartMaxHeight)
+        .animation(nil, value: kind)
+        .animation(nil, value: scrollDate)
+        .animation(nil, value: barCount)
+        .chartOverlay { proxy in tapOverlay(proxy: proxy) }
+        .onChange(of: scrollDate) { _, _ in selectedBucket = nil }
+        .onChange(of: kind)       { _, _ in selectedBucket = nil }
+        .onChange(of: chartMode)  { _, _ in selectedBucket = nil }
+    }
+
+    @ViewBuilder
+    private var efficiencyChart: some View {
+        Chart(efficiencyPoints) { point in
+            LineMark(
+                x: .value("Time", point.bucketDate, unit: kind.bucketComponent),
+                y: .value("$/event", point.cost)
+            )
+            .foregroundStyle(Color.green.opacity(0.85))
+            .interpolationMethod(.catmullRom)
+
+            PointMark(
+                x: .value("Time", point.bucketDate, unit: kind.bucketComponent),
+                y: .value("$/event", point.cost)
+            )
+            .foregroundStyle(selectedBucket == nil || selectedBucket == point.bucketDate
+                ? Color.green
+                : Color.green.opacity(0.3))
+            .symbolSize(selectedBucket == point.bucketDate ? 60 : 30)
+        }
+        .chartXAxis { categoricalXAxis }
+        .chartYAxis { efficiencyYAxis }
+        .chartXScale(domain: commonXScale)
+        .chartLegend(.hidden)
+        .frame(minHeight: chartMinHeight, maxHeight: chartMaxHeight)
+        .animation(nil, value: kind)
+        .animation(nil, value: scrollDate)
+        .animation(nil, value: barCount)
+        .chartOverlay { proxy in tapOverlay(proxy: proxy) }
+        .onChange(of: scrollDate) { _, _ in selectedBucket = nil }
+        .onChange(of: kind)       { _, _ in selectedBucket = nil }
+        .onChange(of: chartMode)  { _, _ in selectedBucket = nil }
+    }
+
+    @ViewBuilder
+    private func tapOverlay(proxy: ChartProxy) -> some View {
+        GeometryReader { geo in
+            Rectangle().fill(.clear).contentShape(Rectangle())
+                .onTapGesture { location in
+                    if let bucket = hitBucket(at: location, proxy: proxy, geo: geo) {
+                        selectedBucket = (selectedBucket == bucket) ? nil : bucket
                     } else {
-                        Text(date.formatted(axisFormat))
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white)
+                        selectedBucket = nil
                     }
                 }
-            }
         }
     }
 
     @AxisContentBuilder
-    private var efficiencyXAxis: some AxisContent {
+    private var categoricalXAxis: some AxisContent {
         AxisMarks(values: .stride(by: kind.bucketComponent)) { value in
             AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                 .foregroundStyle(.primary.opacity(0.18))
@@ -353,6 +417,21 @@ struct BarChartView: View {
             AxisValueLabel {
                 if let v = value.as(Double.self) {
                     Text(String(format: "$%.4f", v))
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white)
+                }
+            }
+        }
+    }
+
+    @AxisContentBuilder
+    private var eventCountYAxis: some AxisContent {
+        AxisMarks(position: .leading) { value in
+            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                .foregroundStyle(.primary.opacity(0.18))
+            AxisValueLabel {
+                if let v = value.as(Int.self) {
+                    Text("\(v)")
                         .font(.system(size: 10, weight: .medium, design: .rounded))
                         .foregroundStyle(.white)
                 }

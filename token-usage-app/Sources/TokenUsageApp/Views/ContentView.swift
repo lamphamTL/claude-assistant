@@ -35,7 +35,7 @@ struct ContentView: View {
     @State private var scrollDate: Date = Self.initialScrollDate(for: .day)
     @State private var selectedProject: String? = nil
     @State private var selectedSource: String? = nil
-    @State private var showEfficiency: Bool = false
+    @State private var chartMode: ChartMode = .cost
     @State private var isHovering = false
     @State private var isPopoutHovering = false
     @State private var barCount: Int = 7
@@ -44,6 +44,38 @@ struct ContentView: View {
     @State private var resizeWorkItem: DispatchWorkItem? = nil
 
     private let sources = [("All", String?.none), ("Claude", "claude"), ("Codex", "codex")]
+
+    @ViewBuilder
+    private var chartModeMenu: some View {
+        Menu {
+            ForEach(ChartMode.allCases) { mode in
+                Button {
+                    chartMode = mode
+                } label: {
+                    if chartMode == mode {
+                        Label(mode.label, systemImage: "checkmark")
+                    } else {
+                        Text(mode.label)
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(chartMode == .cost ? .secondary : Color.green)
+                .frame(width: 22, height: 22)
+                .background(
+                    chartMode == .cost
+                        ? Color.primary.opacity(0.05)
+                        : Color.green.opacity(0.25),
+                    in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                )
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .focusEffectDisabled()
+    }
 
     // Target px per bar (incl. spacing). Keep bar width visually stable across resizes.
     private static let targetBarPx: CGFloat = 36
@@ -111,25 +143,7 @@ struct ContentView: View {
                     .background(.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                     .focusEffectDisabled()
 
-                    // Efficiency toggle
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showEfficiency.toggle()
-                        }
-                    } label: {
-                        Text("$/ev")
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(
-                                showEfficiency
-                                    ? Color.green.opacity(0.25)
-                                    : Color.primary.opacity(0.05),
-                                in: RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            )
-                            .foregroundStyle(showEfficiency ? Color.green : .secondary)
-                    }
-                    .buttonStyle(.plain)
+                    chartModeMenu
 
                     // Pop out to standalone window (hidden when already in window mode)
                     if displayMode == .popover {
@@ -268,7 +282,7 @@ struct ContentView: View {
                         scrollDateBinding: $scrollDate,
                         projectColors: store.projectColors,
                         showCredits: selectedSource == "codex",
-                        showEfficiency: showEfficiency
+                        chartMode: chartMode
                     )
                     .padding(.horizontal, 14)
                     .padding(.bottom, 4)
@@ -404,7 +418,7 @@ struct ContentView: View {
         let component = selectedKind.bucketComponent
         let multiSource = Set(visible.map(\.source)).count > 1
 
-        var grouped: [Date: [String: (cost: Double, tokens: Int, source: String)]] = [:]
+        var grouped: [Date: [String: (cost: Double, tokens: Int, count: Int, source: String)]] = [:]
         var bucketCounts: [Date: Int] = [:]
         var bucketCredits: [Date: Double] = [:]
 
@@ -413,10 +427,11 @@ struct ContentView: View {
             let bucket = interval.start
             let proj = entry.projectDisplayName
             let key = multiSource ? "\(proj) (\(entry.source))" : proj
-            let prev = grouped[bucket]?[key] ?? (cost: 0, tokens: 0, source: entry.source)
+            let prev = grouped[bucket]?[key] ?? (cost: 0, tokens: 0, count: 0, source: entry.source)
             grouped[bucket, default: [:]][key] = (
                 cost:   prev.cost + entry.cost_usd,
                 tokens: prev.tokens + entry.tokens.total,
+                count:  prev.count + 1,
                 source: entry.source
             )
             bucketCounts[bucket, default: 0] += 1
@@ -427,7 +442,8 @@ struct ContentView: View {
         for (date, projects) in grouped {
             for (key, agg) in projects {
                 points.append(ChartPoint(bucketDate: date, project: key, source: agg.source,
-                                         cost: agg.cost, totalTokens: agg.tokens))
+                                         cost: agg.cost, totalTokens: agg.tokens,
+                                         eventCount: agg.count))
             }
         }
         points.sort { $0.bucketDate == $1.bucketDate ? $0.project < $1.project : $0.bucketDate < $1.bucketDate }
