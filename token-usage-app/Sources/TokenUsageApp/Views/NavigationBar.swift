@@ -3,8 +3,10 @@ import SwiftUI
 struct CompactNavigationBar: View {
     @Binding var scrollDate: Date
     let kind: TimeRangeKind
+    let barCount: Int
     let visibleDuration: TimeInterval
     let minDate: Date   // earliest data point — left arrow clamps here
+    let onResetToPresent: () -> Void
 
     var body: some View {
         HStack(spacing: 6) {
@@ -28,7 +30,7 @@ struct CompactNavigationBar: View {
             if !isAtPresent {
                 Button("Now") {
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        scrollDate = TimeWindow.initialScrollDate(for: kind)
+                        onResetToPresent()
                     }
                 }
                 .font(.system(size: 10, weight: .medium, design: .rounded))
@@ -44,8 +46,6 @@ struct CompactNavigationBar: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .disabled(isAtPresent)
-            .opacity(isAtPresent ? 0.3 : 1)
         }
     }
 
@@ -54,7 +54,7 @@ struct CompactNavigationBar: View {
         if kind == .week { cal.firstWeekday = 2 }
         guard let newDate = cal.date(byAdding: kind.bucketComponent, value: direction, to: scrollDate) else { return }
         // Going back: block if the window would end before any data exists
-        let windowEnd = cal.date(byAdding: kind.bucketComponent, value: kind.barCount, to: newDate)
+        let windowEnd = cal.date(byAdding: kind.bucketComponent, value: barCount, to: newDate)
             ?? newDate.addingTimeInterval(visibleDuration)
         if direction < 0, windowEnd < minDate { return }
         withAnimation(.easeInOut(duration: 0.25)) {
@@ -63,7 +63,7 @@ struct CompactNavigationBar: View {
     }
 
     private var visibleEnd: Date { scrollDate.addingTimeInterval(visibleDuration) }
-    private var isAtPresent: Bool { visibleEnd >= Date() }
+    private var isAtPresent: Bool { scrollDate <= Date() && visibleEnd >= Date() }
 
     private var label: String {
         let end = visibleEnd.addingTimeInterval(-1)

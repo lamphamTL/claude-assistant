@@ -26,10 +26,16 @@ struct ChartData {
 struct BarChartView: View {
     let data: ChartData
     let kind: TimeRangeKind
+    let barCount: Int
     let scrollDate: Date            // for x-axis domain
     @Binding var scrollDateBinding: Date
     var showCredits: Bool = false
     var showEfficiency: Bool = false
+
+    @Environment(\.displayMode) private var displayMode
+
+    private var chartMinHeight: CGFloat { 150 }
+    private var chartMaxHeight: CGFloat { displayMode == .window ? 280 : 150 }
 
     private static let palette: [Color] = [
         .blue, .purple, .orange, .teal, .pink, .indigo, .mint
@@ -46,11 +52,7 @@ struct BarChartView: View {
     }
 
     private var visibleDuration: TimeInterval {
-        switch kind {
-        case .day:   return 7  * 24 * 3600
-        case .week:  return 5  * 7  * 24 * 3600
-        case .month: return 5  * 31 * 24 * 3600
-        }
+        Double(max(barCount, 1)) * barDuration
     }
 
     private var visibleEnd: Date { scrollDate.addingTimeInterval(visibleDuration) }
@@ -109,6 +111,18 @@ struct BarChartView: View {
         }
     }
 
+    @ViewBuilder
+    private func weekLabel(for date: Date) -> some View {
+        VStack(spacing: 1) {
+            Text(date.formatted(.dateTime.month(.abbreviated)))
+                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white)
+            Text(date.formatted(.dateTime.day()))
+                .font(.system(size: 9, weight: .regular, design: .rounded))
+                .foregroundStyle(.white.opacity(0.75))
+        }
+    }
+
     private func hitBucket(at location: CGPoint, proxy: ChartProxy, geo: GeometryProxy) -> Date? {
         guard let frame = proxy.plotFrame else { return nil }
         let origin = geo[frame].origin
@@ -158,7 +172,7 @@ struct BarChartView: View {
                 .chartYAxis { efficiencyYAxis }
                 .chartXScale(domain: scrollDate.addingTimeInterval(-barDuration / 2) ... visibleEnd.addingTimeInterval(barDuration / 2))
                 .chartLegend(.hidden)
-                .frame(height: 150)
+                .frame(minHeight: chartMinHeight, maxHeight: chartMaxHeight)
                 .chartOverlay { proxy in
                     GeometryReader { geo in
                         Rectangle().fill(.clear).contentShape(Rectangle())
@@ -192,7 +206,7 @@ struct BarChartView: View {
                 .chartYAxis { costYAxis }
                 .chartXScale(domain: scrollDate.addingTimeInterval(-barDuration / 2) ... visibleEnd.addingTimeInterval(barDuration / 2))
                 .chartLegend(.hidden)
-                .frame(height: 150)
+                .frame(minHeight: chartMinHeight, maxHeight: chartMaxHeight)
                 .chartOverlay { proxy in
                     GeometryReader { geo in
                         Rectangle().fill(.clear).contentShape(Rectangle())
@@ -255,12 +269,16 @@ struct BarChartView: View {
             AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                 .foregroundStyle(.primary.opacity(0.18))
             AxisValueLabel {
-                if kind == .day, let date = value.as(Date.self) {
-                    dayLabel(for: date)
-                } else if let date = value.as(Date.self) {
-                    Text(date.formatted(axisFormat))
-                        .font(.system(size: 10, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white)
+                if let date = value.as(Date.self) {
+                    if kind == .day {
+                        dayLabel(for: date)
+                    } else if kind == .week {
+                        weekLabel(for: date)
+                    } else {
+                        Text(date.formatted(axisFormat))
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundStyle(.white)
+                    }
                 }
             }
         }
@@ -272,12 +290,16 @@ struct BarChartView: View {
             AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                 .foregroundStyle(.primary.opacity(0.18))
             AxisValueLabel {
-                if kind == .day, let date = value.as(Date.self) {
-                    dayLabel(for: date)
-                } else if let date = value.as(Date.self) {
-                    Text(date.formatted(axisFormat))
-                        .font(.system(size: 10, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white)
+                if let date = value.as(Date.self) {
+                    if kind == .day {
+                        dayLabel(for: date)
+                    } else if kind == .week {
+                        weekLabel(for: date)
+                    } else {
+                        Text(date.formatted(axisFormat))
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundStyle(.white)
+                    }
                 }
             }
         }

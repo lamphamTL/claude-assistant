@@ -3,9 +3,10 @@ import AppKit
 import ServiceManagement
 import Combine
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var statusItem: NSStatusItem!
     var popover: NSPopover!
+    var detachedWindow: NSWindow?
     let store = UsageStore()
     private var cancellables = Set<AnyCancellable>()
 
@@ -42,6 +43,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.popover.performClose(nil)
         }
 
+        NotificationCenter.default.addObserver(
+            forName: .init("com.lampham.tokenusage.popout"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.popover.performClose(nil)
+            self?.openDetachedWindow()
+        }
+
         store.$entries
             .receive(on: RunLoop.main)
             .sink { [weak self] entries in self?.updateStatusTitle(entries: entries) }
@@ -59,6 +69,37 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .font: NSFont.systemFont(ofSize: NSFont.systemFontSize(for: .small))
         ]
         statusItem.button?.attributedTitle = NSAttributedString(string: text, attributes: attrs)
+    }
+
+    private func openDetachedWindow() {
+        if let existing = detachedWindow {
+            existing.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let hosting = NSHostingController(rootView:
+            ContentView()
+                .environmentObject(store)
+                .environment(\.displayMode, .window)
+        )
+        let window = NSWindow(contentViewController: hosting)
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.title = "AI Usage"
+        window.isReleasedWhenClosed = false
+        window.contentMinSize = NSSize(width: 320, height: 400)
+        window.setContentSize(NSSize(width: 480, height: 600))
+        window.center()
+        window.delegate = self
+        detachedWindow = window
+
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        guard let closing = notification.object as? NSWindow, closing === detachedWindow else { return }
+        detachedWindow = nil
     }
 
     @objc func togglePopover(_ sender: AnyObject?) {

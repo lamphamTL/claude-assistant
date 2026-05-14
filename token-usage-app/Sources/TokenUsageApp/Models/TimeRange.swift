@@ -85,9 +85,13 @@ struct TimeWindow {
 
     // Bucket-aligned start date for the scroll window (barCount buckets back from now)
     static func initialScrollDate(for kind: TimeRangeKind, relativeTo now: Date = Date()) -> Date {
+        initialScrollDate(for: kind, count: kind.barCount, relativeTo: now)
+    }
+
+    static func initialScrollDate(for kind: TimeRangeKind, count: Int, relativeTo now: Date = Date()) -> Date {
         var cal = Calendar.current
         if kind == .week { cal.firstWeekday = 2 }
-        let bucketBack = cal.date(byAdding: kind.bucketComponent, value: -(kind.barCount - 1), to: now)!
+        let bucketBack = cal.date(byAdding: kind.bucketComponent, value: -(max(count, 1) - 1), to: now)!
         return cal.dateInterval(of: kind.bucketComponent, for: bucketBack)!.start
     }
 }

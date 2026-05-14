@@ -1,15 +1,57 @@
 import SwiftUI
 
+enum DisplayMode { case popover, window }
+
+private struct DisplayModeKey: EnvironmentKey {
+    static let defaultValue: DisplayMode = .popover
+}
+
+extension EnvironmentValues {
+    var displayMode: DisplayMode {
+        get { self[DisplayModeKey.self] }
+        set { self[DisplayModeKey.self] = newValue }
+    }
+}
+
+private struct RootSizeModifier: ViewModifier {
+    let mode: DisplayMode
+    func body(content: Content) -> some View {
+        switch mode {
+        case .popover:
+            content
+                .frame(width: 320)
+                .fixedSize(horizontal: true, vertical: false)
+        case .window:
+            content
+                .frame(minWidth: 320, minHeight: 400)
+        }
+    }
+}
+
 struct ContentView: View {
     @EnvironmentObject var store: UsageStore
+    @Environment(\.displayMode) private var displayMode
     @State private var selectedKind: TimeRangeKind = .day
     @State private var scrollDate: Date = Self.initialScrollDate(for: .day)
     @State private var selectedProject: String? = nil
     @State private var selectedSource: String? = nil
     @State private var showEfficiency: Bool = false
     @State private var isHovering = false
+    @State private var isPopoutHovering = false
+    @State private var barCount: Int = 7
+    @State private var chartData: ChartData = .empty
+    @State private var pendingBarCount: Int? = nil
+    @State private var resizeWorkItem: DispatchWorkItem? = nil
 
     private let sources = [("All", String?.none), ("Claude", "claude"), ("Codex", "codex")]
+
+    // Target px per bar (incl. spacing). Keep bar width visually stable across resizes.
+    private static let targetBarPx: CGFloat = 36
+    // Subtract horizontal chart padding (14*2) + approximate y-axis label area.
+    private func resolvedBarCount(width: CGFloat) -> Int {
+        let plotWidth = max(width - 28 - 40, 100)
+        return max(3, Int(plotWidth / Self.targetBarPx))
+    }
 
     var body: some View {
         ZStack {
@@ -45,7 +87,7 @@ struct ContentView: View {
                             Button {
                                 withAnimation(.easeInOut(duration: 0.25)) {
                                     selectedKind = kind
-                                    scrollDate = Self.initialScrollDate(for: kind)
+                                    scrollDate = centeredScrollDate(for: kind, count: barCount)
                                 }
                             } label: {
                                 Text(kind.rawValue)
@@ -86,21 +128,38 @@ struct ContentView: View {
                     }
                     .buttonStyle(.plain)
 
-                    // Close
-                    Button {
-                        NotificationCenter.default.post(name: .init("com.lampham.tokenusage.close"), object: nil)
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 13))
-                            .foregroundStyle(.secondary.opacity(isHovering ? 0.9 : 0.4))
-                            .symbolRenderingMode(.hierarchical)
+                    // Pop out to standalone window (hidden when already in window mode)
+                    if displayMode == .popover {
+                        Button {
+                            NotificationCenter.default.post(name: .init("com.lampham.tokenusage.popout"), object: nil)
+                        } label: {
+                            Image(systemName: "macwindow.on.rectangle")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary.opacity(isPopoutHovering ? 0.9 : 0.4))
+                                .symbolRenderingMode(.hierarchical)
+                        }
+                        .buttonStyle(.plain)
+                        .onHover { isPopoutHovering = $0 }
+                        .help("Open in window")
                     }
-                    .buttonStyle(.plain)
-                    .onHover { isHovering = $0 }
+
+                    // Close (popover only — window has traffic lights)
+                    if displayMode == .popover {
+                        Button {
+                            NotificationCenter.default.post(name: .init("com.lampham.tokenusage.close"), object: nil)
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.secondary.opacity(isHovering ? 0.9 : 0.4))
+                                .symbolRenderingMode(.hierarchical)
+                        }
+                        .buttonStyle(.plain)
+                        .onHover { isHovering = $0 }
+                    }
                 }
                 .padding(.horizontal, 14)
-                .padding(.top, 4)
-                .padding(.bottom, 2)
+                .padding(.top, 2)
+                .padding(.bottom, 1)
 
                 // ── Source picker ─────────────────────────────────────────
                 HStack(spacing: 2) {
@@ -128,7 +187,7 @@ struct ContentView: View {
                 .padding(3)
                 .background(.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                 .padding(.horizontal, 14)
-                .padding(.bottom, 4)
+                .padding(.bottom, 2)
 
                 // ── Project filter (only if multiple projects) ────────────
                 if !sourceFilteredProjects.isEmpty {
@@ -186,40 +245,114 @@ struct ContentView: View {
                 CompactNavigationBar(
                     scrollDate: $scrollDate,
                     kind: selectedKind,
+                    barCount: barCount,
                     visibleDuration: visibleDuration,
-                    minDate: store.entries.first?.ts ?? Date()
+                    minDate: store.entries.first?.ts ?? Date(),
+                    onResetToPresent: {
+                        scrollDate = centeredScrollDate(for: selectedKind, count: barCount)
+                    }
                 )
                 .padding(.horizontal, 14)
-                .padding(.bottom, 4)
+                .padding(.bottom, 2)
 
                 // ── Chart ─────────────────────────────────────────────────
                 if store.isLoaded {
                     BarChartView(
                         data: chartData,
                         kind: selectedKind,
+                        barCount: barCount,
                         scrollDate: scrollDate,
                         scrollDateBinding: $scrollDate,
                         showCredits: selectedSource == "codex",
                         showEfficiency: showEfficiency
                     )
                     .padding(.horizontal, 14)
-                    .padding(.bottom, 8)
+                    .padding(.bottom, 4)
                 } else {
                     ProgressView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
         }
-        .frame(width: 320)
-        .fixedSize(horizontal: true, vertical: false)
+        .background(
+            GeometryReader { geo in
+                Color.clear
+                    .onAppear { updateBarCount(width: geo.size.width) }
+                    .onChange(of: geo.size.width) { _, w in updateBarCount(width: w) }
+            }
+        )
+        .onChange(of: store.isLoaded) { _, loaded in
+            if loaded {
+                scrollDate = centeredScrollDate(for: selectedKind, count: barCount)
+                chartData = computeChartData()
+            }
+        }
+        .onChange(of: selectedSource)  { _, _ in chartData = computeChartData() }
+        .onChange(of: selectedProject) { _, _ in chartData = computeChartData() }
+        .onChange(of: selectedKind)    { _, _ in chartData = computeChartData() }
+        .onChange(of: scrollDate)      { _, _ in chartData = computeChartData() }
+        .onChange(of: barCount)        { _, _ in chartData = computeChartData() }
+        .onChange(of: store.entries.count) { _, _ in chartData = computeChartData() }
+        .modifier(RootSizeModifier(mode: displayMode))
+    }
+
+    private func updateBarCount(width: CGFloat) {
+        let newCount = resolvedBarCount(width: width)
+        guard newCount != barCount, newCount != pendingBarCount else { return }
+        pendingBarCount = newCount
+
+        resizeWorkItem?.cancel()
+        let work = DispatchWorkItem {
+            applyPendingBarCount()
+        }
+        resizeWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12, execute: work)
+    }
+
+    private func applyPendingBarCount() {
+        guard let newCount = pendingBarCount, newCount != barCount else {
+            pendingBarCount = nil
+            return
+        }
+        let wasAtPresent = scrollDate.addingTimeInterval(visibleDuration) >= Date()
+        barCount = newCount
+        if wasAtPresent {
+            scrollDate = centeredScrollDate(for: selectedKind, count: newCount)
+        }
+        pendingBarCount = nil
+    }
+
+    // Default scroll position: anchored at present, unless data span < bar count,
+    // in which case centre the data with empty buckets on both sides.
+    private func centeredScrollDate(for kind: TimeRangeKind, count: Int) -> Date {
+        let presentAnchored = TimeWindow.initialScrollDate(for: kind, count: count)
+        guard let firstEntry = store.entries.first else { return presentAnchored }
+
+        var cal = Calendar.current
+        if kind == .week { cal.firstWeekday = 2 }
+        let comp = kind.bucketComponent
+
+        guard let dataStart = cal.dateInterval(of: comp, for: firstEntry.ts)?.start else { return presentAnchored }
+        let lastTs = store.entries.last?.ts ?? Date()
+        let dataEnd = cal.dateInterval(of: comp, for: lastTs)?.start ?? dataStart
+
+        let spanBuckets = (cal.dateComponents([comp], from: dataStart, to: dataEnd).value(for: comp) ?? 0) + 1
+        guard spanBuckets < count else { return presentAnchored }
+
+        let leftPad = (count - spanBuckets) / 2
+        return cal.date(byAdding: comp, value: -leftPad, to: dataStart) ?? dataStart
+    }
+
+    private var barDuration: TimeInterval {
+        switch selectedKind {
+        case .day:   return 24 * 3600
+        case .week:  return 7  * 24 * 3600
+        case .month: return 31 * 24 * 3600
+        }
     }
 
     private var visibleDuration: TimeInterval {
-        switch selectedKind {
-        case .day:   return 7  * 24 * 3600
-        case .week:  return 5  * 7  * 24 * 3600
-        case .month: return 5  * 31 * 24 * 3600
-        }
+        Double(max(barCount, 1)) * barDuration
     }
 
     // Source+project filtered slice — uses pre-indexed store caches
@@ -241,7 +374,7 @@ struct ContentView: View {
         var cal = Calendar.current
         if selectedKind == .week { cal.firstWeekday = 2 }
         let end = cal.date(byAdding: selectedKind.bucketComponent,
-                           value: selectedKind.barCount,
+                           value: barCount,
                            to: scrollDate) ?? scrollDate.addingTimeInterval(visibleDuration)
         let lo = lowerBound(entries, target: scrollDate)
         let hi = lowerBound(entries, target: end)
@@ -259,7 +392,7 @@ struct ContentView: View {
     }
 
     // Pre-bucketed chart data — only 5-7 ChartPoints passed to BarChartView
-    private var chartData: ChartData {
+    private func computeChartData() -> ChartData {
         let visible = visibleEntries
         guard !visible.isEmpty else { return .empty }
 
