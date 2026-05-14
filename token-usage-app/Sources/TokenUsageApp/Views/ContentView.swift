@@ -85,7 +85,9 @@ struct ContentView: View {
                     HStack(spacing: 2) {
                         ForEach(TimeRangeKind.allCases) { kind in
                             Button {
-                                withAnimation(.easeInOut(duration: 0.25)) {
+                                var t = Transaction()
+                                t.disablesAnimations = true
+                                withTransaction(t) {
                                     selectedKind = kind
                                     scrollDate = centeredScrollDate(for: kind, count: barCount)
                                 }
@@ -107,6 +109,7 @@ struct ContentView: View {
                     }
                     .padding(3)
                     .background(.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    .focusEffectDisabled()
 
                     // Efficiency toggle
                     Button {
@@ -263,6 +266,7 @@ struct ContentView: View {
                         barCount: barCount,
                         scrollDate: scrollDate,
                         scrollDateBinding: $scrollDate,
+                        projectColors: store.projectColors,
                         showCredits: selectedSource == "codex",
                         showEfficiency: showEfficiency
                     )

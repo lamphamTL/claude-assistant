@@ -29,6 +29,7 @@ struct BarChartView: View {
     let barCount: Int
     let scrollDate: Date            // for x-axis domain
     @Binding var scrollDateBinding: Date
+    let projectColors: [String: Int]
     var showCredits: Bool = false
     var showEfficiency: Bool = false
 
@@ -40,6 +41,24 @@ struct BarChartView: View {
     private static let palette: [Color] = [
         .blue, .purple, .orange, .teal, .pink, .indigo, .mint
     ]
+
+    // Strip " (claude)" / " (codex)" suffix that's appended when the visible
+    // window spans multiple sources, so colour lookup keys to the base project.
+    private static let sourceSuffixes = [" (claude)", " (codex)"]
+    private func baseProjectKey(_ key: String) -> String {
+        for suffix in Self.sourceSuffixes where key.hasSuffix(suffix) {
+            return String(key.dropLast(suffix.count))
+        }
+        return key
+    }
+
+    private func colorFor(_ projectKey: String) -> Color {
+        let base = baseProjectKey(projectKey)
+        if let idx = projectColors[base] {
+            return Self.palette[idx % Self.palette.count]
+        }
+        return Self.palette[abs(base.hashValue) % Self.palette.count]
+    }
 
     @State private var selectedBucket: Date? = nil
 
@@ -173,6 +192,9 @@ struct BarChartView: View {
                 .chartXScale(domain: scrollDate.addingTimeInterval(-barDuration / 2) ... visibleEnd.addingTimeInterval(barDuration / 2))
                 .chartLegend(.hidden)
                 .frame(minHeight: chartMinHeight, maxHeight: chartMaxHeight)
+                .animation(nil, value: kind)
+                .animation(nil, value: scrollDate)
+                .animation(nil, value: barCount)
                 .chartOverlay { proxy in
                     GeometryReader { geo in
                         Rectangle().fill(.clear).contentShape(Rectangle())
@@ -200,13 +222,16 @@ struct BarChartView: View {
                 }
                 .chartForegroundStyleScale(
                     domain: allProjects,
-                    range: Self.palette.prefix(max(allProjects.count, 1)).map { $0 }
+                    range: allProjects.map { colorFor($0) }
                 )
                 .chartXAxis { costXAxis }
                 .chartYAxis { costYAxis }
                 .chartXScale(domain: scrollDate.addingTimeInterval(-barDuration / 2) ... visibleEnd.addingTimeInterval(barDuration / 2))
                 .chartLegend(.hidden)
                 .frame(minHeight: chartMinHeight, maxHeight: chartMaxHeight)
+                .animation(nil, value: kind)
+                .animation(nil, value: scrollDate)
+                .animation(nil, value: barCount)
                 .chartOverlay { proxy in
                     GeometryReader { geo in
                         Rectangle().fill(.clear).contentShape(Rectangle())

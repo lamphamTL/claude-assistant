@@ -10,6 +10,9 @@ final class UsageStore: ObservableObject {
     @Published private(set) var entriesBySource: [String: [UsageEntry]] = [:]
     @Published private(set) var projectsBySource: [String: [String]] = [:]
     @Published private(set) var weeklyCodexCredits: Double = 0
+    // Stable palette index per projectDisplayName, persisted across launches.
+    @Published private(set) var projectColors: [String: Int] = [:]
+    private static let projectColorsKey = "projectColorIndex"
 
     private var claudeWatcher: FileWatcher?
     private var codexWatcher: FileWatcher?
@@ -22,6 +25,10 @@ final class UsageStore: ObservableObject {
     nonisolated static let codexURL:  URL = home.appendingPathComponent(".codex/token-usage/usage.jsonl")
 
     func load() {
+        if let saved = UserDefaults.standard.dictionary(forKey: Self.projectColorsKey) as? [String: Int] {
+            projectColors = saved
+        }
+
         let cw = FileWatcher(url: UsageStore.claudeURL)
         cw.onNewData = { [weak self] data in
             Task { @MainActor [weak self] in self?.ingest(data: data, source: "claude") }
@@ -59,9 +66,25 @@ final class UsageStore: ObservableObject {
                 self.entriesBySource     = derived.bySource
                 self.projectsBySource    = derived.projects
                 self.weeklyCodexCredits  = derived.weeklyCredits
+                self.assignMissingProjectColors(for: all)
                 self.isLoaded            = true
             }
         }
+    }
+
+    private func assignMissingProjectColors(for entries: [UsageEntry]) {
+        let names = Set(entries.map(\.projectDisplayName))
+        var map = projectColors
+        var nextIdx = (map.values.max() ?? -1) + 1
+        var changed = false
+        for name in names where map[name] == nil {
+            map[name] = nextIdx
+            nextIdx += 1
+            changed = true
+        }
+        guard changed else { return }
+        projectColors = map
+        UserDefaults.standard.set(map, forKey: Self.projectColorsKey)
     }
 
     private func ingest(data: Data, source: String) {
@@ -86,6 +109,7 @@ final class UsageStore: ObservableObject {
         entriesBySource    = derived.bySource
         projectsBySource   = derived.projects
         weeklyCodexCredits = derived.weeklyCredits
+        assignMissingProjectColors(for: newEntries)
     }
 
     // MARK: - Derived cache builder (nonisolated — runs off main thread for initial load)
