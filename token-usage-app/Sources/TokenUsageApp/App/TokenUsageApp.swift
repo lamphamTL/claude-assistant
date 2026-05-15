@@ -57,6 +57,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .sink { [weak self] entries in self?.updateStatusTitle(entries: entries) }
             .store(in: &cancellables)
 
+        NotificationCenter.default.addObserver(
+            forName: .NSCalendarDayChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.updateStatusTitle(entries: self.store.entries)
+            }
+        }
+
         try? SMAppService.mainApp.register()
     }
 
