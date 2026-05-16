@@ -38,6 +38,7 @@ struct ContentView: View {
     @State private var chartMode: ChartMode = .cost
     @State private var isHovering = false
     @State private var isPopoutHovering = false
+    @State private var isReloadHovering = false
     @State private var barCount: Int = 7
     @State private var chartData: ChartData = .empty
     @State private var pendingBarCount: Int? = nil
@@ -144,6 +145,19 @@ struct ContentView: View {
                     .focusEffectDisabled()
 
                     chartModeMenu
+
+                    Button {
+                        store.refresh()
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.secondary.opacity(isReloadHovering ? 0.9 : 0.6))
+                            .frame(width: 22, height: 22)
+                            .background(.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .onHover { isReloadHovering = $0 }
+                    .help("Reload data")
 
                     // Pop out to standalone window (hidden when already in window mode)
                     if displayMode == .popover {

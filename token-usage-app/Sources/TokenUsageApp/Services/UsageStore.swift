@@ -33,12 +33,18 @@ final class UsageStore: ObservableObject {
         cw.onNewData = { [weak self] data in
             Task { @MainActor [weak self] in self?.ingest(data: data, source: "claude") }
         }
+        cw.onReload = { [weak self] data in
+            Task { @MainActor [weak self] in self?.reload(data: data, source: "claude") }
+        }
         let claudeInitial = cw.start()
         claudeWatcher = cw
 
         let dw = FileWatcher(url: UsageStore.codexURL)
         dw.onNewData = { [weak self] data in
             Task { @MainActor [weak self] in self?.ingest(data: data, source: "codex") }
+        }
+        dw.onReload = { [weak self] data in
+            Task { @MainActor [weak self] in self?.reload(data: data, source: "codex") }
         }
         let codexInitial = dw.start()
         codexWatcher = dw
@@ -72,6 +78,21 @@ final class UsageStore: ObservableObject {
         }
     }
 
+    func refresh() {
+        claudeWatcher?.stop()
+        codexWatcher?.stop()
+        claudeWatcher = nil
+        codexWatcher = nil
+        claudeLineBuffer = ""
+        codexLineBuffer = ""
+        entries = []
+        entriesBySource = [:]
+        projectsBySource = [:]
+        weeklyCodexCredits = 0
+        isLoaded = false
+        load()
+    }
+
     private func assignMissingProjectColors(for entries: [UsageEntry]) {
         let names = Set(entries.map(\.projectDisplayName))
         var map = projectColors
@@ -85,6 +106,32 @@ final class UsageStore: ObservableObject {
         guard changed else { return }
         projectColors = map
         UserDefaults.standard.set(map, forKey: Self.projectColorsKey)
+    }
+
+    private func reload(data: Data, source: String) {
+        if source == "claude" { claudeLineBuffer = "" } else { codexLineBuffer = "" }
+
+        let decoder = JSONDecoder.usageDecoder
+        var lines = (String(data: data, encoding: .utf8) ?? "").components(separatedBy: "\n")
+        let remainder = lines.removeLast()
+        if source == "claude" { claudeLineBuffer = remainder } else { codexLineBuffer = remainder }
+
+        let fresh = lines.filter { !$0.isEmpty }.compactMap { line -> UsageEntry? in
+            guard let d = line.data(using: .utf8),
+                  var e = try? decoder.decode(UsageEntry.self, from: d) else { return nil }
+            e.source = source
+            return e
+        }
+
+        entries.removeAll { $0.source == source }
+        entries.append(contentsOf: fresh)
+        entries.sort { $0.ts < $1.ts }
+
+        let derived = UsageStore.buildDerived(from: entries)
+        entriesBySource    = derived.bySource
+        projectsBySource   = derived.projects
+        weeklyCodexCredits = derived.weeklyCredits
+        assignMissingProjectColors(for: fresh)
     }
 
     private func ingest(data: Data, source: String) {
