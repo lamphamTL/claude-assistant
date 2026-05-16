@@ -43,6 +43,7 @@ struct ContentView: View {
     @State private var chartData: ChartData = .empty
     @State private var pendingBarCount: Int? = nil
     @State private var resizeWorkItem: DispatchWorkItem? = nil
+    @State private var didFirstRender = false
 
     private let sources = [("All", String?.none), ("Claude", "claude"), ("Codex", "codex")]
 
@@ -313,10 +314,17 @@ struct ContentView: View {
                     .onChange(of: geo.size.width) { _, w in updateBarCount(width: w) }
             }
         )
+        .onAppear {
+            guard !didFirstRender, store.isLoaded else { return }
+            scrollDate = centeredScrollDate(for: selectedKind, count: barCount)
+            chartData = computeChartData()
+            didFirstRender = true
+        }
         .onChange(of: store.isLoaded) { _, loaded in
             if loaded {
                 scrollDate = centeredScrollDate(for: selectedKind, count: barCount)
                 chartData = computeChartData()
+                didFirstRender = true
             }
         }
         .onChange(of: selectedSource)  { _, _ in chartData = computeChartData() }
