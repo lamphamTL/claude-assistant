@@ -9,6 +9,7 @@ final class UsageStore: ObservableObject {
     // Pre-indexed caches — updated once when entries change, not on every render
     @Published private(set) var entriesBySource: [String: [UsageEntry]] = [:]
     @Published private(set) var projectsBySource: [String: [String]] = [:]
+    @Published private(set) var modelsBySource: [String: [String]] = [:]
     @Published private(set) var weeklyCodexCredits: Double = 0
     // Stable palette index per projectDisplayName, persisted across launches.
     @Published private(set) var projectColors: [String: Int] = [:]
@@ -71,6 +72,7 @@ final class UsageStore: ObservableObject {
                 self.entries             = all
                 self.entriesBySource     = derived.bySource
                 self.projectsBySource    = derived.projects
+                self.modelsBySource      = derived.models
                 self.weeklyCodexCredits  = derived.weeklyCredits
                 self.assignMissingProjectColors(for: all)
                 self.isLoaded            = true
@@ -88,6 +90,7 @@ final class UsageStore: ObservableObject {
         entries = []
         entriesBySource = [:]
         projectsBySource = [:]
+        modelsBySource = [:]
         weeklyCodexCredits = 0
         isLoaded = false
         load()
@@ -130,6 +133,7 @@ final class UsageStore: ObservableObject {
         let derived = UsageStore.buildDerived(from: entries)
         entriesBySource    = derived.bySource
         projectsBySource   = derived.projects
+        modelsBySource     = derived.models
         weeklyCodexCredits = derived.weeklyCredits
         assignMissingProjectColors(for: fresh)
     }
@@ -155,6 +159,7 @@ final class UsageStore: ObservableObject {
         let derived = UsageStore.buildDerived(from: entries)
         entriesBySource    = derived.bySource
         projectsBySource   = derived.projects
+        modelsBySource     = derived.models
         weeklyCodexCredits = derived.weeklyCredits
         assignMissingProjectColors(for: newEntries)
     }
@@ -164,23 +169,29 @@ final class UsageStore: ObservableObject {
     private struct Derived {
         let bySource: [String: [UsageEntry]]
         let projects: [String: [String]]
+        let models: [String: [String]]
         let weeklyCredits: Double
     }
 
     nonisolated private static func buildDerived(from entries: [UsageEntry]) -> Derived {
         var bySource: [String: [UsageEntry]] = [:]
         var projectSets: [String: Set<String>] = [:]
+        var modelSets: [String: Set<String>] = [:]
 
         for e in entries {
             bySource[e.source, default: []].append(e)
             if e.project != "unknown" {
                 projectSets[e.source, default: []].insert(e.project)
             }
+            if e.model != "unknown" {
+                modelSets[e.source, default: []].insert(e.model)
+            }
         }
 
         let projects = projectSets.mapValues { set in
             set.sorted { URL(fileURLWithPath: $0).lastPathComponent < URL(fileURLWithPath: $1).lastPathComponent }
         }
+        let models = modelSets.mapValues { set in set.sorted() }
 
         let cal = Calendar(identifier: .iso8601)
         let weekStart = cal.dateInterval(of: .weekOfYear, for: Date())?.start ?? Date()
@@ -189,6 +200,6 @@ final class UsageStore: ObservableObject {
             .compactMap(\.credits)
             .reduce(0, +)
 
-        return Derived(bySource: bySource, projects: projects, weeklyCredits: weeklyCredits)
+        return Derived(bySource: bySource, projects: projects, models: models, weeklyCredits: weeklyCredits)
     }
 }

@@ -35,6 +35,7 @@ struct ContentView: View {
     @State private var scrollDate: Date = Self.initialScrollDate(for: .day)
     @State private var selectedProject: String? = nil
     @State private var selectedSource: String? = nil
+    @State private var selectedModel: String? = nil
     @State private var chartMode: ChartMode = .cost
     @State private var isHovering = false
     @State private var isPopoutHovering = false
@@ -242,6 +243,26 @@ struct ContentView: View {
                     .padding(.bottom, 4)
                 }
 
+                // ── Model filter (only if multiple models) ────────────────
+                if availableModels.count > 1 {
+                    HStack {
+                        Image(systemName: "cpu")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                        Picker("", selection: $selectedModel) {
+                            Text("All models").tag(String?.none)
+                            ForEach(availableModels, id: \.self) { model in
+                                Text(model).tag(Optional(model))
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .font(.system(size: 11))
+                        .labelsHidden()
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 4)
+                }
+
                 // ── Weekly credit tracker (Codex only) ───────────────────
                 if selectedSource == "codex" {
                     let used   = store.weeklyCodexCredits
@@ -327,8 +348,14 @@ struct ContentView: View {
                 didFirstRender = true
             }
         }
-        .onChange(of: selectedSource)  { _, _ in chartData = computeChartData() }
+        .onChange(of: selectedSource)  { _, _ in
+            if let m = selectedModel, !availableModels.contains(m) {
+                selectedModel = nil
+            }
+            chartData = computeChartData()
+        }
         .onChange(of: selectedProject) { _, _ in chartData = computeChartData() }
+        .onChange(of: selectedModel)   { _, _ in chartData = computeChartData() }
         .onChange(of: selectedKind)    { _, _ in chartData = computeChartData() }
         .onChange(of: scrollDate)      { _, _ in chartData = computeChartData() }
         .onChange(of: barCount)        { _, _ in chartData = computeChartData() }
@@ -395,7 +422,7 @@ struct ContentView: View {
         Double(max(barCount, 1)) * barDuration
     }
 
-    // Source+project filtered slice — uses pre-indexed store caches
+    // Source+project+model filtered slice — uses pre-indexed store caches
     private var filteredEntries: [UsageEntry] {
         let base: [UsageEntry]
         if let src = selectedSource {
@@ -403,8 +430,14 @@ struct ContentView: View {
         } else {
             base = store.entries
         }
-        guard let proj = selectedProject else { return base }
-        return base.filter { $0.project == proj }
+        let byProject: [UsageEntry]
+        if let proj = selectedProject {
+            byProject = base.filter { $0.project == proj }
+        } else {
+            byProject = base
+        }
+        guard let m = selectedModel else { return byProject }
+        return byProject.filter { $0.model == m }
     }
 
     // Time-window slice via binary search — O(log n + k)
@@ -488,6 +521,14 @@ struct ContentView: View {
         return Array(Set(all)).sorted {
             URL(fileURLWithPath: $0).lastPathComponent < URL(fileURLWithPath: $1).lastPathComponent
         }
+    }
+
+    private var availableModels: [String] {
+        if let src = selectedSource {
+            return store.modelsBySource[src] ?? []
+        }
+        let all = store.modelsBySource.values.flatMap { $0 }
+        return Array(Set(all)).sorted()
     }
 
     private static func initialScrollDate(for kind: TimeRangeKind) -> Date {
