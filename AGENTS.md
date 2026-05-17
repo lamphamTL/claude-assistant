@@ -133,9 +133,3 @@ claude plugins install claude-assistant@ai-plugins
 codex plugin marketplace upgrade ai-plugins
 ```
 
-## One-time utilities
-
-| Script | Purpose |
-|--------|---------|
-| `claude/hooks/migrate-token-log.py` | Convert old `token-usage.log` (pipe-delimited) to `usage.jsonl` |
-| `claude/hooks/backfill-projects.py` | Patch `project: "unknown"` entries using session transcript `cwd` |

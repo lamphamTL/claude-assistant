@@ -54,12 +54,16 @@ if not transcript or not Path(transcript).exists():
 
 # ── Accumulate cumulative session totals from transcript ──────────────────────
 total_input = total_output = total_cache_write = total_cache_read = 0
+transcript_model = None
 
 with open(transcript, encoding="utf-8") as f:
     for line in f:
         try:
             d = json.loads(line)
-            usage = (d.get("message") or {}).get("usage")
+            msg = d.get("message") or {}
+            if msg.get("model"):
+                transcript_model = msg["model"]
+            usage = msg.get("usage")
             if not usage:
                 continue
             total_input       += usage.get("input_tokens", 0)
@@ -113,6 +117,7 @@ cost = round(
 )
 
 # ── Append JSONL entry ────────────────────────────────────────────────────────
+model = transcript_model or model
 ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 entry = {
     "ts":         ts,
