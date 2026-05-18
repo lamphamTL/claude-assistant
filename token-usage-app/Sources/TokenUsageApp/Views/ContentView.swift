@@ -45,6 +45,7 @@ struct ContentView: View {
     @State private var pendingBarCount: Int? = nil
     @State private var resizeWorkItem: DispatchWorkItem? = nil
     @State private var didFirstRender = false
+    @State private var showFilters = false
 
     private let sources = [("All", String?.none), ("Claude", "claude"), ("Codex", "codex")]
 
@@ -110,9 +111,11 @@ struct ContentView: View {
             VStack(spacing: 0) {
                 // ── Header ───────────────────────────────────────────────
                 HStack(alignment: .center, spacing: 8) {
-                    Text("AI Usage")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.primary.opacity(0.8))
+                    if displayMode == .window {
+                        Text("AI Usage")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.primary.opacity(0.8))
+                    }
 
                     Spacer()
 
@@ -127,7 +130,7 @@ struct ContentView: View {
                                     scrollDate = centeredScrollDate(for: kind, count: barCount)
                                 }
                             } label: {
-                                Text(kind.rawValue)
+                                Text(displayMode == .popover ? kind.shortLabel : kind.rawValue)
                                     .font(.system(size: 11, weight: .medium, design: .rounded))
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 3)
@@ -147,6 +150,42 @@ struct ContentView: View {
                     .focusEffectDisabled()
 
                     chartModeMenu
+
+                    Button {
+                        showFilters.toggle()
+                    } label: {
+                        Image(systemName: isAnyFilterActive ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(isAnyFilterActive ? Color.accentColor : .secondary)
+                            .frame(width: 22, height: 22)
+                            .background(
+                                isAnyFilterActive
+                                    ? Color.accentColor.opacity(0.15)
+                                    : Color.primary.opacity(0.05),
+                                in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            )
+                            .overlay(alignment: .topTrailing) {
+                                if isAnyFilterActive {
+                                    Circle()
+                                        .fill(Color.accentColor)
+                                        .frame(width: 6, height: 6)
+                                        .offset(x: 1, y: -1)
+                                }
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .popover(isPresented: $showFilters, arrowEdge: .top) {
+                        FilterPopoverContent(
+                            selectedSource: $selectedSource,
+                            selectedProject: $selectedProject,
+                            selectedModel: $selectedModel,
+                            sources: sources,
+                            projects: sourceFilteredProjects,
+                            models: availableModels
+                        )
+                        .padding(14)
+                        .frame(width: 260)
+                    }
 
                     Button {
                         store.refresh()
@@ -193,75 +232,6 @@ struct ContentView: View {
                 .padding(.horizontal, 14)
                 .padding(.top, 2)
                 .padding(.bottom, 1)
-
-                // ── Source picker ─────────────────────────────────────────
-                HStack(spacing: 2) {
-                    ForEach(sources, id: \.0) { label, value in
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                selectedSource = value
-                            }
-                        } label: {
-                            Text(label)
-                                .font(.system(size: 11, weight: .medium, design: .rounded))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(
-                                    selectedSource == value
-                                        ? Color.primary.opacity(0.12)
-                                        : Color.clear,
-                                    in: RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(selectedSource == value ? .primary : .secondary)
-                    }
-                }
-                .padding(3)
-                .background(.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                .padding(.horizontal, 14)
-                .padding(.bottom, 2)
-
-                // ── Project filter (only if multiple projects) ────────────
-                if !sourceFilteredProjects.isEmpty {
-                    HStack {
-                        Image(systemName: "folder")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.tertiary)
-                        Picker("", selection: $selectedProject) {
-                            Text("All projects").tag(String?.none)
-                            ForEach(sourceFilteredProjects, id: \.self) { path in
-                                Text(URL(fileURLWithPath: path).lastPathComponent)
-                                    .tag(Optional(path))
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .font(.system(size: 11))
-                        .labelsHidden()
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 4)
-                }
-
-                // ── Model filter (only if multiple models) ────────────────
-                if availableModels.count > 1 {
-                    HStack {
-                        Image(systemName: "cpu")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.tertiary)
-                        Picker("", selection: $selectedModel) {
-                            Text("All models").tag(String?.none)
-                            ForEach(availableModels, id: \.self) { model in
-                                Text(model).tag(Optional(model))
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .font(.system(size: 11))
-                        .labelsHidden()
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 4)
-                }
 
                 // ── Weekly credit tracker (Codex only) ───────────────────
                 if selectedSource == "codex" {
@@ -531,7 +501,101 @@ struct ContentView: View {
         return Array(Set(all)).sorted()
     }
 
+    private var isAnyFilterActive: Bool {
+        selectedSource != nil || selectedProject != nil || selectedModel != nil
+    }
+
     private static func initialScrollDate(for kind: TimeRangeKind) -> Date {
         TimeWindow.initialScrollDate(for: kind)
+    }
+}
+
+private struct FilterPopoverContent: View {
+    @Binding var selectedSource: String?
+    @Binding var selectedProject: String?
+    @Binding var selectedModel: String?
+    let sources: [(String, String?)]
+    let projects: [String]
+    let models: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Filters")
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 2) {
+                ForEach(sources, id: \.0) { label, value in
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            selectedSource = value
+                        }
+                    } label: {
+                        Text(label)
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(
+                                selectedSource == value
+                                    ? Color.primary.opacity(0.12)
+                                    : Color.clear,
+                                in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(selectedSource == value ? .primary : .secondary)
+                }
+            }
+            .padding(3)
+            .background(.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+
+            if !projects.isEmpty {
+                HStack {
+                    Image(systemName: "folder")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                    Picker("", selection: $selectedProject) {
+                        Text("All projects").tag(String?.none)
+                        ForEach(projects, id: \.self) { path in
+                            Text(URL(fileURLWithPath: path).lastPathComponent)
+                                .tag(Optional(path))
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .font(.system(size: 11))
+                    .labelsHidden()
+                }
+            }
+
+            if models.count > 1 {
+                HStack {
+                    Image(systemName: "cpu")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                    Picker("", selection: $selectedModel) {
+                        Text("All models").tag(String?.none)
+                        ForEach(models, id: \.self) { model in
+                            Text(model).tag(Optional(model))
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .font(.system(size: 11))
+                    .labelsHidden()
+                }
+            }
+
+            if selectedSource != nil || selectedProject != nil || selectedModel != nil {
+                Button {
+                    selectedSource = nil
+                    selectedProject = nil
+                    selectedModel = nil
+                } label: {
+                    Text("Reset")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 }

@@ -7,6 +7,14 @@ enum TimeRangeKind: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    var shortLabel: String {
+        switch self {
+        case .day:   return "D"
+        case .week:  return "W"
+        case .month: return "M"
+        }
+    }
+
     // Calendar component that defines one bar
     var bucketComponent: Calendar.Component {
         switch self {
