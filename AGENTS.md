@@ -52,7 +52,8 @@ Written by `claude/hooks/track-tokens.py` on every `Stop` event.
   "model": "claude-sonnet-4-6",
   "project": "ai-plugins",
   "tokens": { "input": 45, "output": 1823, "cache_write": 8420, "cache_read": 112074 },
-  "cost_usd": 0.048312
+  "cost_usd": 0.048312,
+  "isSubAgent": false
 }
 ```
 
@@ -74,7 +75,8 @@ Written by `codex/scripts/track-tokens.py` on every `Stop` event.
   "model": "gpt-5.5",
   "project": "ai-plugins",
   "tokens": { "input": 45, "output": 1823, "cache_read": 112074, "reasoning": 342 },
-  "cost_usd": 0.062100
+  "cost_usd": 0.062100,
+  "isSubAgent": false
 }
 ```
 

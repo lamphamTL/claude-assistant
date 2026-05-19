@@ -130,6 +130,7 @@ entry = {
     "session_id": session_id,
     "model":      model,
     "project":    project,
+    "isSubAgent": False,
     "tokens": {
         "input":      delta_input,
         "output":     delta_output,

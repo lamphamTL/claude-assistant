@@ -10,6 +10,8 @@ session_id = data.get("session_id") or "unknown"
 transcript  = data.get("transcript_path") or ""
 model_raw   = data.get("model") or {}
 model       = model_raw if isinstance(model_raw, str) else (model_raw.get("display_name") or "unknown")
+agent_id    = data.get("agent_id")
+agent_type  = data.get("agent_type")
 
 cwd = data.get("cwd") or ""
 if not cwd:
@@ -80,11 +82,12 @@ state_file = usage_dir / "state.json"
 
 prev_input = prev_output = prev_cache_write = prev_cache_read = 0
 state = {}
+state_key = f"{session_id}:{agent_id}" if agent_id else session_id
 
 if state_file.exists():
     try:
         state = json.loads(state_file.read_text())
-        prev  = state.get(session_id) or {}
+        prev  = state.get(state_key) or {}
         prev_input       = prev.get("input", 0)
         prev_output      = prev.get("output", 0)
         prev_cache_write = prev.get("cache_write", 0)
@@ -101,7 +104,7 @@ if delta_input == 0 and delta_output == 0:
     sys.exit(0)
 
 # ── Persist updated cumulative totals ─────────────────────────────────────────
-state[session_id] = {
+state[state_key] = {
     "input":       total_input,
     "output":      total_output,
     "cache_write": total_cache_write,
@@ -130,7 +133,9 @@ entry = {
         "cache_write": delta_cache_write,
         "cache_read":  delta_cache_read,
     },
-    "cost_usd": cost,
+    "cost_usd":   cost,
+    "isSubAgent": bool(agent_id),
+    "agent_type": agent_type,
 }
 
 with open(usage_dir / "usage.jsonl", "a", encoding="utf-8") as f:
