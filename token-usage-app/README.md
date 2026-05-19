@@ -72,6 +72,7 @@ Written by the `track-tokens.sh` Stop hook in the Codex plugin. Token data is so
 ```
 
 Values are incremental deltas per assistant turn, not cumulative session totals.
+For Codex, `tokens.input` is fresh non-cached input only. Cached input is stored separately in `tokens.cache_read`, matching the Claude log shape.
 
 #### How `cost_usd` is computed
 
@@ -83,7 +84,7 @@ The OpenAI API does not return a spend value, so cost is **approximated** from t
 Formula (reasoning tokens billed at output rate):
 
 ```
-credits  = (input × rate_in + (output + reasoning) × rate_out + cache_read × rate_cache) / 1,000,000
+credits  = (fresh_input × rate_in + (output + reasoning) × rate_out + cache_read × rate_cache) / 1,000,000
 cost_usd = credits × 0.04
 
 # Example — gpt-5.5, values from the JSON above:

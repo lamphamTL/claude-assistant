@@ -81,6 +81,7 @@ Written by `codex/scripts/track-tokens.py` on every `Stop` event.
 ```
 
 - Token data comes from `token_count` events in the session transcript JSONL (`~/.codex/sessions/`).
+- `tokens.input` is fresh non-cached input only; cached input is stored separately as `tokens.cache_read`.
 - Reasoning tokens billed at output rate.
 - Cost rates per model (USD/million): see `codex/scripts/track-tokens.py`.
 
@@ -134,4 +135,3 @@ claude plugins install claude-assistant@ai-plugins
 ```bash
 codex plugin marketplace upgrade ai-plugins
 ```
-

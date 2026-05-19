@@ -42,10 +42,11 @@ except Exception:
 if not last_count:
     sys.exit(0)
 
-in_tok    = last_count.get("input_tokens", 0)
+raw_input = last_count.get("input_tokens", 0)
 out_tok   = last_count.get("output_tokens", 0)
 cached    = last_count.get("cached_input_tokens", 0)
 reasoning = last_count.get("reasoning_output_tokens", 0)
+in_tok    = raw_input - cached
 
 # ── Credits + cost ─────────────────────────────────────────────────────────────
 RATES = {

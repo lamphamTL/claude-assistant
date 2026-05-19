@@ -71,6 +71,7 @@ total_input     = last_count.get("input_tokens", 0)
 total_output    = last_count.get("output_tokens", 0)
 total_cached    = last_count.get("cached_input_tokens", 0)
 total_reasoning = last_count.get("reasoning_output_tokens", 0)
+total_fresh     = total_input - total_cached
 
 # ── Compute incremental delta since last Stop ─────────────────────────────────
 usage_dir  = Path.home() / ".codex/token-usage"
@@ -91,12 +92,13 @@ if state_file.exists():
     except Exception:
         pass
 
-delta_input     = total_input     - prev_input
+prev_fresh        = prev_input - prev_cached
+delta_fresh_input = total_fresh     - prev_fresh
 delta_output    = total_output    - prev_output
 delta_cached    = total_cached    - prev_cached
 delta_reasoning = total_reasoning - prev_reasoning
 
-if delta_input == 0 and delta_output == 0:
+if delta_fresh_input == 0 and delta_output == 0:
     sys.exit(0)
 
 # ── Persist updated cumulative totals ─────────────────────────────────────────
@@ -120,7 +122,7 @@ DEFAULT_RATE  = {"ri": 62.50, "ro": 375, "rc": 6.25}
 CREDIT_TO_USD = 0.04
 
 r       = RATES.get(model.lower(), DEFAULT_RATE)
-credits = round((delta_input * r["ri"] + (delta_output + delta_reasoning) * r["ro"] + delta_cached * r["rc"]) / 1_000_000, 6)
+credits = round((delta_fresh_input * r["ri"] + (delta_output + delta_reasoning) * r["ro"] + delta_cached * r["rc"]) / 1_000_000, 6)
 cost    = round(credits * CREDIT_TO_USD, 6)
 
 # ── Append JSONL entry ────────────────────────────────────────────────────────
@@ -132,7 +134,7 @@ entry = {
     "project":    project,
     "isSubAgent": False,
     "tokens": {
-        "input":      delta_input,
+        "input":      delta_fresh_input,
         "output":     delta_output,
         "cache_read": delta_cached,
         "reasoning":  delta_reasoning,

@@ -10,6 +10,7 @@ A Codex plugin providing token usage tracking, a session cost statusline, and co
 **Hook:** `Stop`
 
 Appends an incremental JSONL entry to `~/.codex/token-usage/usage.jsonl` at the end of every turn.
+`tokens.input` stores fresh non-cached input only; cached input is stored separately as `tokens.cache_read`.
 
 ### 2. Session Statusline
 
