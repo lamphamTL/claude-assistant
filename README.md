@@ -70,6 +70,16 @@ claude plugin install claude-assistant@ai-plugins
 codex plugin marketplace add lamphamTL/ai-plugins
 ```
 
+Bundled plugin hooks in Codex still experimental. Enable feature flags in `~/.codex/config.toml`:
+
+```toml
+[features]
+hooks = true
+plugin_hooks = true
+```
+
+Hooks installed from plugin not enabled by default. Turn them on either by updating `~/.codex/config.toml` or from Codex Desktop App.
+
 ## Updating plugins after hook changes
 
 The marketplace sparse clone doesn't auto-pull on reinstall.
@@ -83,7 +93,5 @@ claude plugins install claude-assistant@ai-plugins
 
 **Codex:**
 ```bash
-git -C ~/.codex/plugins/marketplaces/ai-plugins pull
-codex plugins uninstall codex-assistant@ai-plugins
-codex plugins install codex-assistant@ai-plugins
+codex plugin marketplace upgrade ai-plugins
 ```
