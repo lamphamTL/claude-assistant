@@ -4,16 +4,16 @@ import os
 import re
 import subprocess
 import sys
-import tomllib
+
 
 
 def load_config(cwd, app_home):
     rules = []
-    for path in [os.path.join(cwd, "static-dispatch.toml"),
-                 os.path.join(app_home, "static-dispatch.toml")]:
+    for path in [os.path.join(cwd, "static-dispatch.json"),
+                 os.path.join(app_home, "static-dispatch.json")]:
         if os.path.isfile(path):
-            with open(path, "rb") as f:
-                rules += tomllib.load(f).get("rule", [])
+            with open(path, encoding="utf-8") as f:
+                rules += json.load(f).get("rule", [])
     return rules
 
 
